@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: einkaufsliste_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+
+  redis:
+    image: redis:6.2
+    container_name: einkaufsliste_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "50mb", "--maxmemory-policy", "allkeys-lru"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    container_name: einkaufsliste_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: "mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017"
+      REDIS_HOST: ${REDIS_HOST}
+      MONGO_DATABASE: ${MONGO_DATABASE}
+    depends_on:
+      - mongodb
+      - redis
