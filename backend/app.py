@@ -8,14 +8,15 @@ from bson import ObjectId
 import redis
 import os
 import json
-from typing import List, Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Optional, Annotated
 
 
 # Umgebungsvariablen abrufen
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
+SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -88,12 +89,13 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None):
     if expires_delta:
         to_encode.update({"exp": expires_delta})
     else:
-        to_encode.update({"exp": 3600})
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+        to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 # Benutzerinformationen aus Token extrahieren
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
@@ -270,23 +272,11 @@ def root():
 
 # MongoDB: Tabelle dynamisch erstellen
 @app.post("/mongo/{collection_name}")
-def create_table(collection_name: str):
+def create_table(collection_name: str, current_user: User = Depends(get_current_active_user)):
     if collection_name in db.list_collection_names():
         raise HTTPException(status_code=400, detail="Collection already exists")
     db.create_collection(collection_name)
     return {"message": f"Collection '{collection_name}' created successfully"}
-
-
-# MongoDB: Liste von Items hinzufügen
-@app.post("/mongo/{collection_name}/items")
-def add_items(collection_name: str, items: List[Dict]):
-    if collection_name not in db.list_collection_names():
-        raise HTTPException(status_code=404, detail="Collection not found")
-    collection = db[collection_name]
-    result = collection.insert_many(items)
-    # Benachrichtigung über WebSocket
-    redis_client.publish("realtime", f"Added {len(result.inserted_ids)} items to {collection_name}")
-    return {"message": f"{len(result.inserted_ids)} items added", "ids": [str(id) for id in result.inserted_ids]}
 
 # MongoDB-Methoden aktualisieren
 @app.get("/mongo/{collection_name}/items")
@@ -314,6 +304,22 @@ async def get_items(collection_name: str, current_user: User = Depends(get_curre
 
     return {"source": "mongodb", "data": data}
 
+# MongoDB: Einzelnes Item erstellen
+@app.post("/mongo/{collection_name}/item")
+def create_item(collection_name: str, item: Dict, current_user: User = Depends(get_current_active_user)):
+    # Check if the collection exists
+    if collection_name not in db.list_collection_names():
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Insert the item into the collection
+    collection = db[collection_name]
+    result = collection.insert_one(item)
+    
+    # Publish a WebSocket notification
+    redis_client.publish("realtime", f"Created item with ID {result.inserted_id} in {collection_name}")
+    
+    # Return the inserted item's ID
+    return {"message": "Item created", "item_id": str(result.inserted_id)}
 
 # MongoDB: Einzelnes Item bearbeiten
 @app.put("/mongo/{collection_name}/item/{item_id}")
