@@ -21,7 +21,11 @@ services:
       - "6379:6379"
     volumes:
       - ./redis-data:/data
+<<<<<<< HEAD
+    command: ["redis-server", "--appendonly", "yes"]
+=======
     command: ["redis-server", "--appendonly", "no", "--maxmemory", "50mb", "--maxmemory-policy", "allkeys-lru"]
+>>>>>>> 1a367befbd8ce4d0d626bb9697ec3611dd24d678
 
   backend:
     build:
