@@ -12,10 +12,17 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Annotated
 from .routers import user
 
-
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Umgebungsvariablen abrufen
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+
+mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+db = mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
 
 # OAuth2 Setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -23,18 +30,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Passwort-Kontext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Benutzerdatenbank simuliert
-fake_users_db = {
-    "user1": {
-        "username": "user1",
-        "full_name": "User One",
-        "email": "user1@example.com",
-        "hashed_password": pwd_context.hash("password1"),
-        "disabled": False,
-    }
-}
-
-router = APIRouter()
+router = APIRouter(
+    tags=["user"],
+    responses={404: {"description": "Not found"}},
+)
 
 # Modelle
 class Token(BaseModel):
@@ -51,15 +50,38 @@ class UserInDB(user.User):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-# Benutzer abrufen
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
+# **Benutzer aus `users`-Collection abrufen**
+def get_user(username: str):
+    user_dict = db["users"].find_one({"username": username})
+    if user_dict:
         return UserInDB(**user_dict)
+    return None
+
+# **Benutzer in `users`-Collection speichern**
+def create_user(username: str, fullname: str, email: str, password: str):
+    if get_user(username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user = UserInDB(
+        username=username,
+        full_name=fullname,
+        email=email,
+        hashed_password=pwd_context.hash(password),
+        disabled=False
+    )
+    
+    db["users"].insert_one(user.model_dump())
+    return user
+
+# **Benutzer aus `users`-Collection löschen**
+def delete_user_in_db(username: str):
+    result = db["users"].delete_one({"username": username})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
 
 # Authentifizierung überprüfen
-def authenticate_user(db, username: str, password: str):
-    user = get_user(db, username)
+def authenticate_user(username: str, password: str):
+    user = get_user(username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -92,7 +114,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
+    user = get_user(username=token_data.username)
     if user is None:
         raise credentials_exception
     return user
@@ -103,14 +125,42 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
     return current_user
 
 # Geschützter Endpunkt
-@router.get("/users/me", response_model=user.User)
+@router.get("/user/me", response_model=user.User)
 async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
     return current_user
+
+# Neuen Nutzer anlegen
+@router.post("/user/sign_up", response_model=Token)
+async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
+    user = get_user(username)
+    if user == None:
+        user = create_user(username, fullname, email, password)
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="username already exists",
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Nutzer entfernen
+@router.post("/user/delete")
+async def delete_user(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    delete_user_in_db(username)
+    return {"message": "user deleted"}
 
 # Authentifizierung: Token-Endpunkt
 @router.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=401,

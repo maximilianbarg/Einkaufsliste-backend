@@ -1,20 +1,20 @@
 # build image
-# docker build -t einkaufsliste_backend .
+# docker build -t einkaufsliste_backend . 
 
 # Basis-Image mit Python
 FROM python:3.13-slim
 
 # Arbeitsverzeichnis im Container setzen
-WORKDIR /app
+WORKDIR /code
 
 # Abhängigkeiten hinzufügen
-COPY requirements.txt .
+COPY requirements.txt /code/requirements.txt
 
 # Installieren der Python-Bibliotheken
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /code/requirements.txt
 
 # Application Code kopieren
-COPY . .
+COPY ./app /code/app
 
 # Startbefehl für das Backend
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["fastapi", "run", "app/main.py", "--port", "8000"]

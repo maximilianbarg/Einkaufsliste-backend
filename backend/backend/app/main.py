@@ -5,9 +5,6 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from pymongo import MongoClient
 from bson import ObjectId
-import redis
-import os
-import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Annotated
 from .routers import user, collections, websockets, shared_collections
@@ -27,4 +24,4 @@ app.include_router(websockets.router)
 # Root-Endpunkt
 @app.get("/")
 def root():
-    return {"message": "Python Backend with Realtime and Dynamic Collections is running!"}
+    return {"message": "Einkaufsliste Backend is running!"}

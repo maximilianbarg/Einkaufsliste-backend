@@ -1,4 +1,6 @@
 mongo-data
 redis-data
 .obsidian
-__pycache__
+__pycache__/
+*.pyc
+.vscode

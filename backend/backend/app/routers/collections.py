@@ -12,10 +12,9 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Annotated
 from ..dependencies import user, get_current_active_user
 
-
 router = APIRouter(
-    prefix="/shared",
-    tags=["shared"],
+    prefix="/private",
+    tags=["private"],
     dependencies=[Depends(get_current_active_user)],
     responses={404: {"description": "Not found"}},
 )
@@ -27,16 +26,15 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 
-# MongoDB-Client einrichten
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[MONGO_DATABASE]
+mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+db = mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
 
 # Redis-Client einrichten
 redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
 
 # MongoDB: Tabelle dynamisch erstellen
-@router.post("/{collection_name}")
+@router.post("/create/{collection_name}")
 def create_table(collection_name: str, current_user: User = Depends(get_current_active_user)):
     if collection_name in db.list_collection_names():
         raise HTTPException(status_code=400, detail="Collection already exists")

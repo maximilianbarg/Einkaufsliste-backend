@@ -1,50 +1,32 @@
-# Geteilte Listen
+# User
 ```mermaid
 classDiagram
     class User{
-        +id
-        +name
+        +username: string
+        +fullname: string
+        +email: string
+        +password: hash
+        +id: uuid
+        +private_lists: [ids]
+        +shared_lists: [ids]
     }
-    class user_id_Shared_Lists{
-        +ids
-    }
-    class id_Shared_List{
-	    +name
-	    +users
-	    -user_id
-	    -user_name
-        +data
-    }
-    note "reference with id"
-    user_id_Shared_Lists <|-- id_Shared_List
-    note "reference with user id"
-    User <|-- user_id_Shared_Lists
 ```
 
-
-# Private Listen
+# Collections
 ```mermaid
 classDiagram
-    note "From Duck till Zebra"
-    Animal <|-- Duck
-    note for Duck "can fly\ncan swim\ncan dive\ncan help in debugging"
-    Animal <|-- Fish
-    Animal <|-- Zebra
-    Animal : +int age
-    Animal : +String gender
-    Animal: +isMammal()
-    Animal: +mate()
-    class Duck{
-        +String beakColor
-        +swim()
-        +quack()
+    class Collection_List{
+        +Collection: id, name
     }
-    class Fish{
-        -int sizeInFeet
-        -canEat()
+
+    class Collection{
+        +name
+        +users: [ids]
+        +items: Item
     }
-    class Zebra{
-        +bool is_wild
-        +run()
+
+    class Item{
+        +any
     }
+
 ```

@@ -24,9 +24,7 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: dockerfile
+    image: einkaufsliste_backend
     container_name: einkaufsliste_backend
     restart: always
     ports:
