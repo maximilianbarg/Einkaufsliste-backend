@@ -1,3 +1,4 @@
+import bson
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -46,6 +47,54 @@ class TokenData(BaseModel):
 class UserInDB(user.User):
     hashed_password: str
 
+# Geschützter Endpunkt
+@router.get("/user/me", response_model=user.User)
+async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
+    return current_user
+
+# Neuen Nutzer anlegen
+@router.post("/user/sign_up", response_model=Token)
+async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
+    user = get_user(username)
+    if user == None:
+        user = create_user(username, fullname, email, password)
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="username already exists",
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Nutzer entfernen
+@router.post("/user/delete")
+async def delete_user(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    delete_user_in_db(username)
+    return {"message": "user deleted"}
+
+# Authentifizierung: Token-Endpunkt
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+## helper methods
+
 # Passwort-Hash überprüfen
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -76,6 +125,21 @@ def create_user(username: str, fullname: str, email: str, password: str):
 # **Benutzer aus `users`-Collection löschen**
 def delete_user_in_db(username: str):
     result = db["users"].delete_one({"username": username})
+
+    collections_to_delete = db.users_collections.find({"owner": username})
+
+    # delete owned collections
+    for col in list(collections_to_delete):
+        db.drop_collection(col["id"])
+
+    db.users_collections.delete_many({"owner": username})
+
+    # delete user from collection list
+    db.users_collections.update_many(
+        {"users": username},  # Alle Dokumente finden, in denen der Benutzer existiert
+        {"$pull": {"users": username}}  # Benutzer aus der `users`-Liste entfernen
+    )
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -123,49 +187,3 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
-
-# Geschützter Endpunkt
-@router.get("/user/me", response_model=user.User)
-async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
-    return current_user
-
-# Neuen Nutzer anlegen
-@router.post("/user/sign_up", response_model=Token)
-async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
-    user = get_user(username)
-    if user == None:
-        user = create_user(username, fullname, email, password)
-    else:
-        raise HTTPException(
-            status_code=403,
-            detail="username already exists",
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Nutzer entfernen
-@router.post("/user/delete")
-async def delete_user(username: str, password: str):
-    user = authenticate_user(username, password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    delete_user_in_db(username)
-    return {"message": "user deleted"}
-
-# Authentifizierung: Token-Endpunkt
-@router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
