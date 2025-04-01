@@ -63,7 +63,7 @@ def create_table(collection_name: str, current_user: User = Depends(get_current_
     collection_id = str(bson.ObjectId())
 
     # check if collection already exists
-    get_collection_in_db(collection_name, user_id, should_exist=False)
+    get_collection_in_db(collection_name, user_id)
 
     # Collection erstellen
     db.create_collection(collection_id)
@@ -188,12 +188,12 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
 def get_collection_by_id(collection_id: str) -> Collection:
     return db[collection_id]
 
-def get_collection_in_db(collection_name: str, user_id: str, should_exist: bool = True) -> Collection:
-    collection_id = get_collection_id(collection_name, user_id, should_exist)
-    return db[collection_id] if collection_id else None
-
 def get_collection_info(collection_id) -> Dict:
     return db.users_collections.find_one({"id": collection_id})
+
+def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
+    collection_id = get_collection_id(collection_name, user_id, False)
+    return db[collection_id] if collection_id else None
 
 def get_collection_id(collection_name, user_id, should_exist: bool = True):
     collection = db.users_collections.find_one(
