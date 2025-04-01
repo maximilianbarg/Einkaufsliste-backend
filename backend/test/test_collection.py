@@ -47,6 +47,41 @@ class TestCollectionAPI:
         assert response.json()["message"] == "Item created"
         assert response.json()["item_id"] != None
 
+    def test_update_item_in_collection(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.post(f"{url}/private/create/test_collection", headers=headers)
+        item_data = {"name": "test_item", "description": "This is a test item"}
+        collection_id = response.json()["collection_id"]
+        response = requests.post(f"{url}/private/{collection_id}/item", headers=headers, json=item_data)
+
+        # when
+        item_id = response.json()["item_id"]
+        item_data = {"name": "test_item_new", "description": "This is a new test item"}
+        response = requests.put(f"{url}/private/{collection_id}/item/{item_id}", headers=headers, json=item_data)
+
+        # then
+        assert response.status_code == 200
+        assert response.json()["message"] == "Item updated"
+
+    def test_delete_item_in_collection(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.post(f"{url}/private/create/test_collection", headers=headers)
+        item_data = {"name": "test_item", "description": "This is a test item"}
+        collection_id = response.json()["collection_id"]
+        response = requests.post(f"{url}/private/{collection_id}/item", headers=headers, json=item_data)
+
+        # when
+        item_id = response.json()["item_id"]
+        response = requests.delete(f"{url}/private/{collection_id}/item/{item_id}", headers=headers)
+
+        # then
+        assert response.status_code == 200
+        assert response.json()["message"] == "Item deleted"
+
     def test_get_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
