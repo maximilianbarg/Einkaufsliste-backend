@@ -14,8 +14,8 @@ from typing import Collection, List, Dict, Optional, Annotated
 from ..dependencies import user, get_current_active_user
 
 router = APIRouter(
-    prefix="/private",
-    tags=["private"],
+    prefix="/collections",
+    tags=["collections"],
     dependencies=[Depends(get_current_active_user)],
     responses={404: {"description": "Not found"}},
 )
