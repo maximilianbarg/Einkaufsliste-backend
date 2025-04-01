@@ -36,6 +36,8 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+## classes
+
 # Modelle
 class Token(BaseModel):
     access_token: str
@@ -46,52 +48,6 @@ class TokenData(BaseModel):
 
 class UserInDB(user.User):
     hashed_password: str
-
-# Geschützter Endpunkt
-@router.get("/user/me", response_model=user.User)
-async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
-    return current_user
-
-# Neuen Nutzer anlegen
-@router.post("/user/sign_up", response_model=Token)
-async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
-    user = get_user(username)
-    if user == None:
-        user = create_user(username, fullname, email, password)
-    else:
-        raise HTTPException(
-            status_code=403,
-            detail="username already exists",
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Nutzer entfernen
-@router.post("/user/delete")
-async def delete_user(username: str, password: str):
-    user = authenticate_user(username, password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    delete_user_in_db(username)
-    return {"message": "user deleted"}
-
-# Authentifizierung: Token-Endpunkt
-@router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
 
 ## helper methods
 
@@ -187,3 +143,51 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+## endpoints
+
+# Geschützter Endpunkt
+@router.get("/user/me", response_model=user.User)
+async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
+    return current_user
+
+# Neuen Nutzer anlegen
+@router.post("/user/sign_up", response_model=Token)
+async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
+    user = get_user(username)
+    if user == None:
+        user = create_user(username, fullname, email, password)
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="username already exists",
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Nutzer entfernen
+@router.post("/user/delete")
+async def delete_user(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    delete_user_in_db(username)
+    return {"message": "user deleted"}
+
+# Authentifizierung: Token-Endpunkt
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
