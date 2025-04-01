@@ -1,17 +1,10 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, APIRouter
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
-from pymongo import MongoClient
+from fastapi import HTTPException, Depends, APIRouter
 from bson import ObjectId
-import redis
-import os
 import json
 import bson
-from datetime import datetime, timedelta, timezone
-from typing import Collection, List, Dict, Optional, Annotated
+from typing import Collection, Dict
 from ..dependencies import user, get_current_active_user
+from ..dbclient import DbClient
 
 router = APIRouter(
     prefix="/collections",
@@ -24,16 +17,10 @@ cache_time = 300
 
 User = user.User
 
-# Umgebungsvariablen abrufen
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-
-mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
-
-# Redis-Client einrichten
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+# get db and redis
+db_client = DbClient()
+db = db_client.db
+redis_client = db_client.redis_client
 
 
 ## collection methods -------------------------------------------------------------------------

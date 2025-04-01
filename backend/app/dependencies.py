@@ -1,29 +1,23 @@
 import bson
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, APIRouter
+from fastapi import HTTPException, Depends, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from pymongo import MongoClient
-from bson import ObjectId
-import redis
 import os
-import json
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional, Annotated
+from typing import Optional, Annotated
 from .routers import user
+from .dbclient import DbClient
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Umgebungsvariablen abrufen
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-
-mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
+# get db and redis
+db_client = DbClient()
+db = db_client.db
+redis_client = db_client.redis_client
 
 # OAuth2 Setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
