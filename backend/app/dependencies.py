@@ -114,7 +114,10 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None):
     return encoded_jwt
 
 # Benutzerinformationen aus Token extrahieren
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserInDB:
+    return await extract_token(token)
+
+async def extract_token(token: str) -> UserInDB:
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
@@ -133,7 +136,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         raise credentials_exception
     return user
 
-async def get_current_active_user(current_user: user.User = Depends(get_current_user)):
+async def get_current_active_user(current_user: user.User = Depends(get_current_user)) -> UserInDB:
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
