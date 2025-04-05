@@ -1,147 +1,74 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, APIRouter
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
-from pymongo import MongoClient
-from bson import ObjectId
-import redis
-import os
-import json
-from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional, Annotated
-from ..dependencies import user, get_current_active_user
+from fastapi import WebSocket, WebSocketDisconnect, Depends, APIRouter
+from ..dependencies import user, extract_token, get_current_active_user
+from ..connection_manager import ConnectionManager
 
 router = APIRouter(
     prefix="/sockets",
     tags=["sockets"],
-    dependencies=[Depends(get_current_active_user)],
     responses={404: {"description": "Not found"}},
 )
 
 User = user.User
-
-class ConnectionManager:
-    def __init__(self):
-        # Speichert WebSocket-Verbindungen mit einer Benutzer-ID
-        self.active_connections: Dict[str, WebSocket] = {}
-        # Speichert Benutzer-IDs, die zu Gruppen gehören
-        self.groups: Dict[str, List[str]] = {}  # Gruppenname -> Liste von Benutzer-IDs
-
-    # Verbindungsaufbau mit Benutzer-ID
-    async def connect(self, websocket: WebSocket, user_id: str):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-
-    # Trennung der Verbindung
-    def disconnect(self, websocket: WebSocket):
-        # Entfernt die Verbindung basierend auf der WebSocket-Instanz
-        user_id = next((uid for uid, conn in self.active_connections.items() if conn == websocket), None)
-        if user_id:
-            del self.active_connections[user_id]
-
-    # Nachricht an eine spezifische Verbindung senden
-    async def send_message(self, user_id: str, message: str):
-        websocket = self.active_connections.get(user_id)
-        if websocket:
-            await websocket.send_text(message)
-        else:
-            print(f"User {user_id} is not connected.")
-
-    # Broadcast an alle Verbindungen senden
-    async def broadcast(self, message: str):
-        for connection in self.active_connections.values():
-            try:
-                await connection.send_text(message)
-            except WebSocketDisconnect:
-                self.disconnect(connection)
-
-    # Nachricht an eine Gruppe von Benutzern senden
-    async def send_to_group(self, group_name: str, message: str):
-        # Hole alle Benutzer-IDs in der Gruppe
-        user_ids = self.groups.get(group_name, [])
-        for user_id in user_ids:
-            await self.send_message(user_id, message)
-
-    # Benutzer zu einer Gruppe hinzufügen
-    def add_user_to_group(self, user_id: str, group_name: str):
-        if group_name not in self.groups:
-            self.groups[group_name] = []
-        if user_id not in self.groups[group_name]:
-            self.groups[group_name].append(user_id)
-
-    # Benutzer aus einer Gruppe entfernen
-    def remove_user_from_group(self, user_id: str, group_name: str):
-        if group_name in self.groups and user_id in self.groups[group_name]:
-            self.groups[group_name].remove(user_id)
-
-    # Alle Mitglieder einer Gruppe entfernen
-    def remove_all_users_from_group(self, group_name: str):
-        if group_name in self.groups:
-            del self.groups[group_name]
-
-    # Liste aller Gruppen eines Benutzers
-    def get_user_groups(self, user_id: str):
-        return [group_name for group_name, members in self.groups.items() if user_id in members]
-
-    # Alle Benutzer einer Gruppe abrufen
-    def get_group_members(self, group_name: str):
-        return self.groups.get(group_name, [])
-
 
 # Manager-Instanz erstellen
 manager = ConnectionManager()
 
 
 @router.websocket("/connect")
-async def websocket_endpoint(websocket: WebSocket, current_user: User = Depends(get_current_active_user)):
-    # Verbindungsaufbau mit Benutzer-ID
-    await manager.connect(websocket, current_user.id)
+async def websocket_endpoint(websocket: WebSocket):
 
-    # Optional: Benutzer zu einer Gruppe hinzufügen (z.B. "example_group")
-    manager.add_user_to_group(current_user.id, "example_group")
+    authorization = websocket.headers.get("Authorization")
+    token = authorization.split(" ")[1]
+    current_user: User = await extract_token(token)
+
+    user_id = current_user.username
+
+    # Verbindungsaufbau mit Benutzer-ID
+    await manager.connect(websocket, user_id)
 
     try:
         while True:
-            data = await websocket.receive_text()
-            # Beispiel: Nachricht an eine Gruppe senden
-            await manager.send_to_group("example_group", f"Message from {current_user.username}: {data}")
+            await websocket.receive_text() # nur dafür da, damit der websocket erhalten bleibt
     except WebSocketDisconnect:
-        # Entfernen des Benutzers aus der Gruppe und Trennen der Verbindung
-        manager.remove_user_from_group(current_user.id, "example_group")
+        channels = manager.get_subscribed_channels_of_user(user_id)
+
+        for channel in channels:
+            # Entfernen des Benutzers aus der Gruppe und Trennen der Verbindung
+            manager.remove_user_from_channel(user_id, channel)
+
         manager.disconnect(websocket)
 
 
 # Beispiel-Endpunkt: Nachricht an alle Benutzer senden (Broadcast)
 @router.post("/broadcast")
-async def broadcast_message(message: str):
-    await manager.broadcast(message)
+def broadcast_message(message: str):
+    manager.send_to_broadcast(message)
     return {"message": "Broadcast sent to all connected users."}
 
 
 # Beispiel-Endpunkt: Nachricht an eine Gruppe senden
-@router.post("/group/{group_name}")
-async def send_to_group(group_name: str, message: str):
-    await manager.send_to_group(group_name, message)
-    return {"message": f"Message sent to group {group_name}."}
+@router.post("/channel/{channel_name}")
+def send_to_channel(channel_name: str, message: str):
+    manager.send_to_channel(channel_name, message)
+    return {"message": f"Message sent to group {channel_name}."}
 
 
 # Beispiel-Endpunkt: Benutzer zu einer Gruppe hinzufügen
-@router.post("/group/{group_name}/add/{user_id}")
-async def add_user_to_group(group_name: str, user_id: str):
-    manager.add_user_to_group(user_id, group_name)
-    return {"message": f"User {user_id} added to group {group_name}."}
+@router.post("/channel/{channel_name}/subscribe")
+def add_user_to_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
+    manager.add_user_to_channel(current_user.username, channel_name)
+    return {"message": f"User {current_user.username} added to group {channel_name}."}
 
 
 # Beispiel-Endpunkt: Benutzer aus einer Gruppe entfernen
-@router.post("/group/{group_name}/remove/{user_id}")
-async def remove_user_from_group(group_name: str, user_id: str):
-    manager.remove_user_from_group(user_id, group_name)
-    return {"message": f"User {user_id} removed from group {group_name}."}
+@router.post("/channel/{channel_name}/unsubscribe")
+def remove_user_from_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
+    manager.remove_user_from_channel(current_user.username, channel_name)
+    return {"message": f"User {current_user.username} removed from group {channel_name}."}
 
 
 # Beispiel-Endpunkt: Alle Mitglieder einer Gruppe abrufen
-@router.get("/group/{group_name}/members")
-async def get_group_members(group_name: str):
-    members = manager.get_group_members(group_name)
+@router.get("/channel/{channel_name}/members")
+async def get_channel_members(channel_name: str, current_user: User = Depends(get_current_active_user)):
+    members = manager.get_users_of_channel(channel_name)
     return {"members": members}

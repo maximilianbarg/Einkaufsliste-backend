@@ -1,21 +1,16 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, APIRouter
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
-from pymongo import MongoClient
+from fastapi import HTTPException, Depends, APIRouter
 from bson import ObjectId
-import redis
-import os
 import json
 import bson
-from datetime import datetime, timedelta, timezone
-from typing import Collection, List, Dict, Optional, Annotated
+from typing import Collection, Dict
+
+from ..connection_manager import ConnectionManager
 from ..dependencies import user, get_current_active_user
+from ..dbclient import DbClient
 
 router = APIRouter(
-    prefix="/private",
-    tags=["private"],
+    prefix="/collections",
+    tags=["collections"],
     dependencies=[Depends(get_current_active_user)],
     responses={404: {"description": "Not found"}},
 )
@@ -24,22 +19,19 @@ cache_time = 300
 
 User = user.User
 
-# Umgebungsvariablen abrufen
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DATABASE = os.getenv("MONGO_DATABASE", "my_database")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+# get db and redis
+db_client = DbClient()
+db = db_client.db
+redis_client = db_client.redis_client
 
-mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
-
-# Redis-Client einrichten
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+# Manager-Instanz erstellen
+sockets = ConnectionManager()
 
 
 ## collection methods -------------------------------------------------------------------------
 
 @router.get("/list")
-async def get_collections(current_user: User = Depends(get_current_active_user)):   
+def get_collections(current_user: User = Depends(get_current_active_user)):   
     # get collection
     collections = db.users_collections.find() #{"users": user_id}
     
@@ -99,16 +91,13 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
     redis_key = f"collection_cache:{collection_id}"
     redis_client.delete(redis_key)
 
-    # Benachrichtigung über WebSocket
-    redis_client.publish("realtime", f"Deleted collection {collection_id}")
-
     return {"message": f"Collection '{collection_id}' deleted successfully"}
 
 
 ## item methods -------------------------------------------------------------------------
 
 @router.get("/{collection_id}/items")
-async def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
+def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
     # 1. In Redis nachsehen
     redis_key = f"collection_cache:{collection_id}"
     cached_data = redis_client.get(redis_key)
@@ -143,11 +132,20 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
     # Insert the item into the collection
     result = collection.insert_one(item)
 
+    item_id = str(result.inserted_id)
+
+    # Das aktualisierte Item abrufen
+    created_item = collection.find_one({"_id": ObjectId(item_id)})
+
+    # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
+    if created_item:
+        created_item["_id"] = str(created_item["_id"])  # ObjectId in String umwandeln
+
     # Publish a WebSocket notification
-    redis_client.publish("realtime", f"Created item with ID {result.inserted_id} in {collection_id}")
+    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
     
     # Return the inserted item's ID
-    return {"message": "Item created", "item_id": str(result.inserted_id)}
+    return {"message": "Item created", "item_id": item_id}
 
 # MongoDB: Einzelnes Item bearbeiten
 @router.put("/{collection_id}/item/{item_id}")
@@ -160,8 +158,15 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    # Benachrichtigung über WebSocket
-    redis_client.publish("realtime", f"Updated item with ID {item_id} in {collection_id}")
+    # Das aktualisierte Item abrufen
+    updated_item = collection.find_one({"_id": ObjectId(item_id)})
+
+    # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
+    if updated_item:
+        updated_item["_id"] = str(updated_item["_id"])  # ObjectId in String umwandeln
+
+    # Publish a WebSocket notification
+    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
 
     return {"message": "Item updated"}
 
@@ -177,8 +182,8 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    # Benachrichtigung über WebSocket
-    redis_client.publish("realtime", f"Deleted item with ID {item_id} from {collection_id}")
+    # Publish a WebSocket notification
+    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "item_id": f"{item_id}"}))
 
     return {"message": "Item deleted"}
 
