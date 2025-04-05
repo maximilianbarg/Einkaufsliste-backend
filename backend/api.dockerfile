@@ -18,8 +18,9 @@ COPY ./app /code/app
 
 # Startbefehl für das Backend
 
-# debug
-CMD ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "-m", "fastapi", "run", "app/main.py", "--port", "8000"]
+ENV DEBUG=${DEBUG}
 
-#production 
-# CMD ["fastapi", "run", "app/main.py", "--port", "8000"]
+COPY ./start-api.sh /code/start-api.sh
+RUN chmod +x /code/start-api.sh
+
+ENTRYPOINT ["/code/start-api.sh"]

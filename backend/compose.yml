@@ -8,10 +8,11 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - ./mongo-data:/data/db
+      - ./data/mongo-data:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    mem_limit: 1g
 
   redis:
     image: redis:6.2
@@ -20,19 +21,26 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ./redis-data:/data
-    command: ["redis-server", "--appendonly", "yes"]
+      - ./data/redis-data:/data
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 512m
 
   backend:
     image: einkaufsliste_backend
     container_name: einkaufsliste_backend
+    build:
+      context: .
+      dockerfile: api.dockerfile
     restart: always
     ports:
       - "8000:8000"
+      - "5678:5678" # debug only
     environment:
       MONGO_URI: "mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017"
       REDIS_HOST: ${REDIS_HOST}
       MONGO_DATABASE: ${MONGO_DATABASE}
+      DEBUG: ${DEBUG}
     depends_on:
       - mongodb
       - redis
+    mem_limit: 1g

@@ -3,4 +3,3 @@ redis-data
 .obsidian
 __pycache__/
 *.pyc
-.vscode
