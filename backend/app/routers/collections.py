@@ -93,6 +93,35 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
 
     return {"message": f"Collection '{collection_id}' deleted successfully"}
 
+# MongoDB: Tabelle teilen
+@router.patch("/{collection_id}/users/add/{user_id}")
+def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+   
+    # add user to list
+    result = db.users_collections.update_one(
+        {"id": collection_id, "owner": current_user.username},
+        {"$addToSet": {"users": user_id}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not owner of collection")
+
+    return {"message": f"Collection '{collection_id}' shared with user '{user_id}'"}
+
+# MongoDB: Tabelle teilen
+@router.patch("/{collection_id}/users/remove/{user_id}")
+def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+   
+    # add user to list
+    result = db.users_collections.update_one(
+        {"id": collection_id, "owner": current_user.username},
+        {"$pull": {"users": user_id}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"message": f"User '{user_id}' removed from collection '{collection_id}'"}
 
 ## item methods -------------------------------------------------------------------------
 

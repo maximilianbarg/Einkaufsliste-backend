@@ -65,6 +65,38 @@ class TestCollectionAPI:
         assert response.status_code == 200
         assert response.json()["message"] == "Item updated"
 
+    def test_share_collection(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        collection_id = response.json()["collection_id"]
+
+        # when
+        user_id = "test_user_shared"
+        response = requests.patch(f"{url}/collections/{collection_id}/users/add/{user_id}", headers=headers)
+
+        # then
+        assert response.status_code == 200
+        assert response.json()["message"] != None
+
+    def test_unshare_collection(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        collection_id = response.json()["collection_id"]
+
+        user_id = "test_user_shared"
+        requests.patch(f"{url}/collections/{collection_id}/users/add/{user_id}", headers=headers)
+
+        # when
+        response = requests.patch(f"{url}/collections/{collection_id}/users/remove/{user_id}", headers=headers)
+
+        # then
+        assert response.status_code == 200
+        assert response.json()["message"] != None
+
     def test_delete_item_in_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
