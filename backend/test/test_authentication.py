@@ -1,4 +1,5 @@
 import requests
+from fastapi import status
 
 url = "http://localhost:8000"
 
@@ -12,7 +13,7 @@ def test_sign_up():
 
     response = requests.post(f"{url}/user/sign_up", params=data)
 
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     assert "access_token" in response.json()
 
 def test_auth_succeed():
@@ -20,7 +21,7 @@ def test_auth_succeed():
 
     response = requests.post(f"{url}/token", data=data)  
 
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     assert "access_token" in response.json()
 
 def test_auth_failed():
@@ -28,7 +29,7 @@ def test_auth_failed():
 
     response = requests.post(f"{url}/token", data=data)  
 
-    assert response.status_code == 401
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 def test_sign_up_duplicate():
     data = {
@@ -40,7 +41,7 @@ def test_sign_up_duplicate():
 
     response = requests.post(f"{url}/user/sign_up", params=data)  
 
-    assert response.status_code == 403
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 def test_delete_user():
     data = {
@@ -50,5 +51,5 @@ def test_delete_user():
 
     response = requests.post(f"{url}/user/delete", params=data)  
 
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     assert response.json()["message"] == "user deleted"

@@ -1,5 +1,5 @@
 import requests
-import pytest
+from fastapi import status
 
 url = "http://localhost:8000"
 
@@ -27,7 +27,7 @@ class TestCollectionAPI:
         response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Collection 'test_collection' created successfully"
         assert response.json()["collection_id"] != None
 
@@ -43,7 +43,7 @@ class TestCollectionAPI:
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item created"
         assert response.json()["item_id"] != None
 
@@ -62,7 +62,7 @@ class TestCollectionAPI:
         response = requests.put(f"{url}/collections/{collection_id}/item/{item_id}", headers=headers, json=item_data)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item updated"
 
     def test_share_collection(self):
@@ -77,7 +77,7 @@ class TestCollectionAPI:
         response = requests.patch(f"{url}/collections/{collection_id}/users/add/{user_id}", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] != None
 
     def test_unshare_collection(self):
@@ -94,7 +94,7 @@ class TestCollectionAPI:
         response = requests.patch(f"{url}/collections/{collection_id}/users/remove/{user_id}", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] != None
 
     def test_delete_item_in_collection(self):
@@ -111,7 +111,7 @@ class TestCollectionAPI:
         response = requests.delete(f"{url}/collections/{collection_id}/item/{item_id}", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item deleted"
 
     def test_get_collection(self):
@@ -126,7 +126,7 @@ class TestCollectionAPI:
         response = requests.get(f"{url}/collections/{collection_id}/items", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json()["source"] != None
         assert response.json()["name"] == "test_collection"
         assert response.json()["data"] != None
@@ -143,7 +143,7 @@ class TestCollectionAPI:
         response = requests.delete(f"{url}/collections/{collection_id}", headers=headers)
 
         # then
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         assert response.json() == {"message": f"Collection '{collection_id}' deleted successfully"}
 
     def create_user(self) -> str:

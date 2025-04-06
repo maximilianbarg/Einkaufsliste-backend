@@ -3,11 +3,12 @@ import pytest
 import aiohttp
 import requests
 import json
+from fastapi import status
 
 url = "http://localhost:8000"
 uri = "ws://localhost:8000/sockets/connect"
 username2 = "test_websocket_user"
-username1 = "test_user"
+username1 = "test_websocket_user_2"
 password = "test_password"
 
 
@@ -52,12 +53,12 @@ async def test_websocket_connection_create_item():
             async def subscribe_user():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == 200
+                    assert response.status == status.HTTP_200_OK
 
             async def create_item():
                 post_url = f"{url}/collections/{collection_id}/item"
                 async with session.post(post_url, headers=headers1, json=item_data) as response:
-                    assert response.status == 200     
+                    assert response.status == status.HTTP_200_OK     
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())
@@ -114,12 +115,12 @@ async def test_websocket_connection_edit_item():
             async def subscribe_user():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == 200
+                    assert response.status == status.HTTP_200_OK
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.put(post_url, headers=headers1, json=item_data) as response:
-                    assert response.status == 200     
+                    assert response.status == status.HTTP_200_OK     
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())
@@ -173,12 +174,12 @@ async def test_websocket_connection_remove_item():
             async def subscribe_user():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == 200
+                    assert response.status == status.HTTP_200_OK
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.delete(post_url, headers=headers1) as response:
-                    assert response.status == 200     
+                    assert response.status == status.HTTP_200_OK     
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())

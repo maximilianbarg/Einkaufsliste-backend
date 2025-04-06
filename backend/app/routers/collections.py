@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, APIRouter
+from fastapi import HTTPException, Depends, APIRouter, status
 from bson import ObjectId
 import json
 import bson
@@ -12,7 +12,7 @@ router = APIRouter(
     prefix="/collections",
     tags=["collections"],
     dependencies=[Depends(get_current_active_user)],
-    responses={404: {"description": "Not found"}},
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
 cache_time = 300
@@ -104,7 +104,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
     )
 
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Not owner of collection")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not owner of collection")
 
     return {"message": f"Collection '{collection_id}' shared with user '{user_id}'"}
 
@@ -119,7 +119,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
     )
 
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return {"message": f"User '{user_id}' removed from collection '{collection_id}'"}
 
@@ -185,7 +185,7 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
     result = collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
 
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # Das aktualisierte Item abrufen
     updated_item = collection.find_one({"_id": ObjectId(item_id)})
@@ -209,7 +209,7 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
     result = collection.delete_one({"_id": ObjectId(item_id)})
 
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "item_id": f"{item_id}"}))
@@ -235,9 +235,9 @@ def get_collection_id(collection_name, user_id, should_exist: bool = True):
     )
 
     if not collection and should_exist:
-        raise HTTPException(status_code=404, detail="Collection not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     
     if collection and not should_exist:
-        raise HTTPException(status_code=400, detail="Collection already exists for this user")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Collection already exists for this user")
     
     return collection["id"] if collection else None

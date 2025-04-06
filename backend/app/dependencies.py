@@ -1,5 +1,5 @@
 import bson
-from fastapi import HTTPException, Depends, APIRouter
+from fastapi import HTTPException, Depends, APIRouter, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -27,7 +27,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter(
     tags=["user"],
-    responses={404: {"description": "Not found"}},
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
 ## classes
@@ -59,7 +59,7 @@ def get_user(username: str):
 # **Benutzer in `users`-Collection speichern**
 def create_user(username: str, fullname: str, email: str, password: str):
     if get_user(username):
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
 
     user = UserInDB(
         username=username,
@@ -91,7 +91,7 @@ def delete_user_in_db(username: str):
     )
 
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 # Authentifizierung überprüfen
 def authenticate_user(username: str, password: str):
@@ -119,7 +119,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Use
 
 async def extract_token(token: str) -> UserInDB:
     credentials_exception = HTTPException(
-        status_code=401,
+        status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
@@ -138,7 +138,7 @@ async def extract_token(token: str) -> UserInDB:
 
 async def get_current_active_user(current_user: user.User = Depends(get_current_user)) -> UserInDB:
     if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 
 ## endpoints
@@ -156,7 +156,7 @@ async def sign_up_for_access_token(username: str, fullname: str, email: str, pas
         user = create_user(username, fullname, email, password)
     else:
         raise HTTPException(
-            status_code=403,
+            status_code=status.HTTP_409_CONFLICT,
             detail="username already exists",
         )
     access_token = create_access_token(data={"sub": user.username})
@@ -168,7 +168,7 @@ async def delete_user(username: str, password: str):
     user = authenticate_user(username, password)
     if not user:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -182,7 +182,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
