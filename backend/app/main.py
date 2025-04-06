@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from .routers import collections, websockets
 from .dependencies import router
@@ -16,6 +17,9 @@ async def lifespan(app: FastAPI):
 
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
+
+DEBUG = os.getenv("Debug", "false")
+app.debug = True if(DEBUG == "true") else False
 
 app.include_router(router)
 app.include_router(collections.router)
