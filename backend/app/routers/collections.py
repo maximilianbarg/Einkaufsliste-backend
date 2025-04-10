@@ -29,13 +29,13 @@ redis_client = db_client.redis_client
 sockets = ConnectionManager()
 
 
-## collection methods -------------------------------------------------------------------------
+## user collections -------------------------------------------------------------------------
 
 @router.get("/list")
-def get_collections(current_user: User = Depends(get_current_active_user)):   
+def get_collections(current_user: User = Depends(get_current_active_user)):
     # get collection
     collections = db.users_collections.find({"users": current_user.username})
-    
+
     # get items
     data = list(collections)
 
@@ -44,8 +44,11 @@ def get_collections(current_user: User = Depends(get_current_active_user)):
         del item["_id"]
 
     collection_json = {"data": data}
-    
+
     return {"source": "db"} | collection_json
+
+
+## collection methods -------------------------------------------------------------------------
 
 # MongoDB: Tabelle dynamisch erstellen
 @router.post("/create/{collection_name}")
@@ -80,12 +83,12 @@ def create_table(collection_name: str, current_user: User = Depends(get_current_
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
 def delete_table(collection_id: str, current_user: User = Depends(get_current_active_user)):
-   
+
     # delete from users list
     db.users_collections.find_one_and_delete(
         {"id": collection_id}
     )
-    
+
     # delete list
     db.drop_collection(collection_id)
 
@@ -95,10 +98,18 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
 
     return {"message": f"Collection '{collection_id}' deleted successfully"}
 
+@router.get("/{collection_id}/info")
+def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
+    collection_info = get_collection_info(collection_id)
+
+    del collection_info["_id"]
+
+    return {"source": "db", "data": collection_info}
+
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
 def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
-   
+
     # add user to list
     result = db.users_collections.update_one(
         {"id": collection_id, "owner": current_user.username},
@@ -113,7 +124,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
 def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
-   
+
     # add user to list
     result = db.users_collections.update_one(
         {"id": collection_id, "owner": current_user.username},
@@ -125,6 +136,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
 
     return {"message": f"User '{user_id}' removed from collection '{collection_id}'"}
 
+
 ## item methods -------------------------------------------------------------------------
 
 @router.get("/{collection_id}/items")
@@ -135,11 +147,11 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
     if cached_data:
         # Daten aus Redis zurückgeben
         return {"source": "cache"} | json.loads(cached_data)
-    
+
     # get collection
     collection = get_collection_by_id(collection_id)
     collection_name = get_collection_info(collection_id)["collection_name"]
-    
+
     # get items
     data = list(collection.find())
 
@@ -159,7 +171,7 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
 def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
     # get collection
     collection = get_collection_by_id(collection_id)
-    
+
     # Insert the item into the collection
     result = collection.insert_one(item)
 
@@ -177,7 +189,7 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
-    
+
     # Return the inserted item's ID
     return {"message": "Item created", "item_id": item_id}
 
@@ -192,7 +204,7 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
 
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-    
+
     # update modified date
     update_modified_status_of_collection(collection_id)
 
@@ -219,7 +231,7 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-    
+
     # update modified date
     update_modified_status_of_collection(collection_id)
 
@@ -248,10 +260,10 @@ def get_collection_id(collection_name, user_id, should_exist: bool = True):
 
     if not collection and should_exist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
-    
+
     if collection and not should_exist:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Collection already exists for this user")
-    
+
     return collection["id"] if collection else None
 
 def update_modified_status_of_collection(collection_id):
