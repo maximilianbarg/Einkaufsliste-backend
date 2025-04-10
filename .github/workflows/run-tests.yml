@@ -24,6 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx pytest
 
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
       - name: Start Docker Compose
         run: |
           cd backend
@@ -33,7 +38,7 @@ jobs:
       - name: Wait for services to be healthy
         run: |
           docker-compose ps
-          sleep 10  # optional: du kannst hier auch Healthchecks machen oder abfragen
+          sleep 10  # optional: you can include health checks here
 
       - name: Run Pytest
         run: |
