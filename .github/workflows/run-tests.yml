@@ -1,0 +1,55 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install asyncio pytest aiohttp requests anyio pytest-asyncio
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Start Docker Compose
+        run: |
+          cd backend
+          docker-compose up --build -d
+        timeout-minutes: 3
+
+      - name: Wait for services to be healthy
+        run: |
+          cd backend
+          docker-compose ps
+          sleep 10  # optional: you can include health checks here
+
+      - name: Run Pytest
+        run: |
+          cd backend/test
+          python3 -m pytest
+
+      - name: Shut down Docker Compose
+        if: always()
+        run: |
+          cd backend
+          docker-compose down
