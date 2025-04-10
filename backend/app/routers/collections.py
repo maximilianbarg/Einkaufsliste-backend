@@ -3,6 +3,7 @@ from bson import ObjectId
 import json
 import bson
 from typing import Collection, Dict
+from datetime import datetime
 
 from ..connection_manager import ConnectionManager
 from ..dependencies import user, get_current_active_user
@@ -33,7 +34,7 @@ sockets = ConnectionManager()
 @router.get("/list")
 def get_collections(current_user: User = Depends(get_current_active_user)):   
     # get collection
-    collections = db.users_collections.find() #{"users": user_id}
+    collections = db.users_collections.find({"users": current_user.username})
     
     # get items
     data = list(collections)
@@ -66,7 +67,8 @@ def create_table(collection_name: str, current_user: User = Depends(get_current_
         {
             "$set": {
                 "id": collection_id,  # Collection-ID speichern
-                "owner": user_id  # Besitzer speichern
+                "owner": user_id,  # Besitzer speichern
+                "last_modified": datetime.now().isoformat()  # datum speichern
             },
             "$addToSet": {"users": user_id}  # Benutzer nur hinzufügen, falls noch nicht vorhanden
         },
@@ -161,6 +163,9 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
     # Insert the item into the collection
     result = collection.insert_one(item)
 
+    # update modified date
+    update_modified_status_of_collection(collection_id)
+
     item_id = str(result.inserted_id)
 
     # Das aktualisierte Item abrufen
@@ -176,6 +181,7 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
     # Return the inserted item's ID
     return {"message": "Item created", "item_id": item_id}
 
+
 # MongoDB: Einzelnes Item bearbeiten
 @router.put("/{collection_id}/item/{item_id}")
 def update_item(collection_id: str, item_id: str, updates: Dict, current_user: User = Depends(get_current_active_user)):
@@ -186,6 +192,9 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
 
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    
+    # update modified date
+    update_modified_status_of_collection(collection_id)
 
     # Das aktualisierte Item abrufen
     updated_item = collection.find_one({"_id": ObjectId(item_id)})
@@ -210,6 +219,9 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+    
+    # update modified date
+    update_modified_status_of_collection(collection_id)
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "item_id": f"{item_id}"}))
@@ -241,3 +253,9 @@ def get_collection_id(collection_name, user_id, should_exist: bool = True):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Collection already exists for this user")
     
     return collection["id"] if collection else None
+
+def update_modified_status_of_collection(collection_id):
+    db.users_collections.update_one(
+        {"id": collection_id},
+        {"$set": {"last_modified": datetime.now().isoformat()}}
+    )
