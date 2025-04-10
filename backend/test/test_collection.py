@@ -152,7 +152,8 @@ class TestCollectionAPI:
             "username": self.username,
             "fullname": "User One",
             "email": "user1@example.com",
-            "password": self.password
+            "password": self.password,
+            "admin_key": "09g25e02fha9ca"
         }
 
         response = requests.post(f"{url}/user/sign_up", params=data)   

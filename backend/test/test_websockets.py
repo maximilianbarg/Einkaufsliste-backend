@@ -18,7 +18,8 @@ async def create_user(username: str, password: str) -> str:
             "username": username,
             "fullname": "User One",
             "email": "user1@example.com",
-            "password": password
+            "password": password,
+            "admin_key": "09g25e02fha9ca"
         }
     
     async with aiohttp.ClientSession() as session:

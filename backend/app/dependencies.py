@@ -11,6 +11,7 @@ from .routers import user
 from .dbclient import DbClient
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -57,9 +58,9 @@ def get_user(username: str):
     return None
 
 # **Benutzer in `users`-Collection speichern**
-def create_user(username: str, fullname: str, email: str, password: str):
-    if get_user(username):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+def create_user(username: str, fullname: str, email: str, password: str, admin_key: str):
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin key wrong")
 
     user = UserInDB(
         username=username,
@@ -150,10 +151,10 @@ async def read_users_me(current_user: user.User = Depends(get_current_active_use
 
 # Neuen Nutzer anlegen
 @router.post("/user/sign_up", response_model=Token)
-async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str):
+async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str, admin_key: str):
     user = get_user(username)
     if user == None:
-        user = create_user(username, fullname, email, password)
+        user = create_user(username, fullname, email, password, admin_key)
     else:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

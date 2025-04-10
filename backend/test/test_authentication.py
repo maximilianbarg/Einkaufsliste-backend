@@ -8,7 +8,8 @@ def test_sign_up():
         "username": "test_user",
         "fullname": "User One",
         "email": "user1@example.com",
-        "password": "test_password"
+        "password": "test_password",
+        "admin_key": "09g25e02fha9ca"
     }
 
     response = requests.post(f"{url}/user/sign_up", params=data)
@@ -36,7 +37,8 @@ def test_sign_up_duplicate():
         "username": "test_user",
         "fullname": "User One",
         "email": "user1@example.com",
-        "password": "test_password"
+        "password": "test_password",
+        "admin_key": "09g25e02fha9ca"
     }
 
     response = requests.post(f"{url}/user/sign_up", params=data)  
