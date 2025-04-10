@@ -5,6 +5,7 @@ pymongo==4.10.1
 redis==5.2.1
 python-jose==3.4.0
 passlib[bcrypt]==1.7.4
+bcrypt==3.2.0
 pydantic==2.10.4
 python-multipart==0.0.20
 debugpy

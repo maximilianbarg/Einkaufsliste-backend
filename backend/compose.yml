@@ -39,6 +39,8 @@ services:
       MONGO_URI: "mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017"
       REDIS_HOST: ${REDIS_HOST}
       MONGO_DATABASE: ${MONGO_DATABASE}
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_KEY: ${ADMIN_KEY}
       DEBUG: ${DEBUG}
     depends_on:
       - mongodb

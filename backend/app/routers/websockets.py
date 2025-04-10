@@ -1,11 +1,11 @@
-from fastapi import WebSocket, WebSocketDisconnect, Depends, APIRouter
+from fastapi import WebSocket, WebSocketDisconnect, Depends, APIRouter, status
 from ..dependencies import user, extract_token, get_current_active_user
 from ..connection_manager import ConnectionManager
 
 router = APIRouter(
     prefix="/sockets",
     tags=["sockets"],
-    responses={404: {"description": "Not found"}},
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
 User = user.User
