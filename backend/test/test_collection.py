@@ -13,8 +13,8 @@ class TestCollectionAPI:
 
     def teardown_method(self):
         """Delete the user after each test"""
-        requests.post(f"{url}/user/delete", params=self.data)  
-        
+        requests.post(f"{url}/user/delete", params=self.data)
+
     def authenticate(self) -> str:
         response = requests.post(f"{url}/token", data=self.data)
         return response.json().get("access_token")
@@ -22,7 +22,7 @@ class TestCollectionAPI:
     def test_create_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
-        
+
         # when
         response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
 
@@ -30,6 +30,20 @@ class TestCollectionAPI:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Collection 'test_collection' created successfully"
         assert response.json()["collection_id"] != None
+
+    def test_get_collection_info(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        collection_id = response.json()["collection_id"]
+
+        # when
+        response = requests.get(f"{url}/collections/{collection_id}/info", headers=headers)
+
+        # then
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["source"] == "db"
+        assert response.json()["data"] != None
 
     def test_add_item_to_collection(self):
         # given
@@ -156,7 +170,6 @@ class TestCollectionAPI:
             "admin_key": "09g25e02fha9ca"
         }
 
-        response = requests.post(f"{url}/user/sign_up", params=data)   
+        response = requests.post(f"{url}/user/sign_up", params=data)
 
         return response.json().get("access_token")
-    
