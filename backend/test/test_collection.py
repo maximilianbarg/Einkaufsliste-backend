@@ -24,7 +24,7 @@ class TestCollectionAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         # when
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
 
         # then
         assert response.status_code == status.HTTP_200_OK
@@ -34,7 +34,7 @@ class TestCollectionAPI:
     def test_get_collection_info(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         collection_id = response.json()["collection_id"]
 
         # when
@@ -49,7 +49,7 @@ class TestCollectionAPI:
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
 
         # when
         item_data = {"name": "test_item", "description": "This is a test item"}
@@ -65,7 +65,7 @@ class TestCollectionAPI:
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
         collection_id = response.json()["collection_id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
@@ -83,7 +83,7 @@ class TestCollectionAPI:
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         collection_id = response.json()["collection_id"]
 
         # when
@@ -98,7 +98,7 @@ class TestCollectionAPI:
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         collection_id = response.json()["collection_id"]
 
         user_id = "test_user_shared"
@@ -115,7 +115,7 @@ class TestCollectionAPI:
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
         collection_id = response.json()["collection_id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
@@ -131,7 +131,7 @@ class TestCollectionAPI:
     def test_get_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
         collection_id = response.json()["collection_id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
@@ -148,7 +148,7 @@ class TestCollectionAPI:
     def test_delete_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
-        response = requests.post(f"{url}/collections/create/test_collection", headers=headers)
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
         collection_id = response.json()["collection_id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
