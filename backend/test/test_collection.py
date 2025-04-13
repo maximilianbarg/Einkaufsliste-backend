@@ -13,7 +13,7 @@ class TestCollectionAPI:
 
     def teardown_method(self):
         """Delete the user after each test"""
-        requests.post(f"{url}/user/delete", params=self.data)
+        requests.post(f"{url}/user/delete", data=self.data)
 
     def authenticate(self) -> str:
         response = requests.post(f"{url}/token", data=self.data)
@@ -29,13 +29,13 @@ class TestCollectionAPI:
         # then
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Collection 'test_collection' created successfully"
-        assert response.json()["collection_id"] != None
+        assert response.json()["id"] != None
 
     def test_get_collection_info(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
 
         # when
         response = requests.get(f"{url}/collections/{collection_id}/info", headers=headers)
@@ -53,13 +53,13 @@ class TestCollectionAPI:
 
         # when
         item_data = {"name": "test_item", "description": "This is a test item"}
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # then
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item created"
-        assert response.json()["item_id"] != None
+        assert response.json()["id"] != None
 
     def test_update_item_in_collection(self):
         # given
@@ -67,11 +67,11 @@ class TestCollectionAPI:
 
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # when
-        item_id = response.json()["item_id"]
+        item_id = response.json()["id"]
         item_data = {"name": "test_item_new", "description": "This is a new test item"}
         response = requests.put(f"{url}/collections/{collection_id}/item/{item_id}", headers=headers, json=item_data)
 
@@ -84,7 +84,7 @@ class TestCollectionAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
 
         # when
         user_id = "test_user_shared"
@@ -99,7 +99,7 @@ class TestCollectionAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
 
         user_id = "test_user_shared"
         requests.patch(f"{url}/collections/{collection_id}/users/add/{user_id}", headers=headers)
@@ -117,11 +117,11 @@ class TestCollectionAPI:
 
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # when
-        item_id = response.json()["item_id"]
+        item_id = response.json()["id"]
         response = requests.delete(f"{url}/collections/{collection_id}/item/{item_id}", headers=headers)
 
         # then
@@ -133,7 +133,7 @@ class TestCollectionAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # when
@@ -150,7 +150,7 @@ class TestCollectionAPI:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
         item_data = {"name": "test_item", "description": "This is a test item"}
-        collection_id = response.json()["collection_id"]
+        collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
         # when
@@ -158,7 +158,8 @@ class TestCollectionAPI:
 
         # then
         assert response.status_code == status.HTTP_200_OK
-        assert response.json() == {"message": f"Collection '{collection_id}' deleted successfully"}
+        assert response.json()["message"] == "Collection deleted successfully"
+        assert response.json()["id"] == collection_id
 
     def create_user(self) -> str:
         # create user
@@ -170,6 +171,6 @@ class TestCollectionAPI:
             "admin_key": "09g25e02fha9ca"
         }
 
-        response = requests.post(f"{url}/user/sign_up", params=data)
+        response = requests.post(f"{url}/user/sign_up", data=data)
 
         return response.json().get("access_token")

@@ -1,5 +1,5 @@
 import bson
-from fastapi import HTTPException, Depends, APIRouter, status
+from fastapi import HTTPException, Depends, APIRouter, status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -69,7 +69,7 @@ def create_user(username: str, fullname: str, email: str, password: str, admin_k
         hashed_password=pwd_context.hash(password),
         disabled=False
     )
-    
+
     db["users"].insert_one(user.model_dump())
     return user
 
@@ -151,7 +151,7 @@ async def read_users_me(current_user: user.User = Depends(get_current_active_use
 
 # Neuen Nutzer anlegen
 @router.post("/user/sign_up", response_model=Token)
-async def sign_up_for_access_token(username: str, fullname: str, email: str, password: str, admin_key: str):
+async def sign_up_for_access_token(username: str = Form(...), fullname: str = Form(...), email: str = Form(...), password: str = Form(...), admin_key: str = Form(...)):
     user = get_user(username)
     if user == None:
         user = create_user(username, fullname, email, password, admin_key)
@@ -165,7 +165,7 @@ async def sign_up_for_access_token(username: str, fullname: str, email: str, pas
 
 # Nutzer entfernen
 @router.post("/user/delete")
-async def delete_user(username: str, password: str):
+async def delete_user(username: str = Form(...), password: str = Form(...)):
     user = authenticate_user(username, password)
     if not user:
         raise HTTPException(

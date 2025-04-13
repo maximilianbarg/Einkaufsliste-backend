@@ -21,17 +21,17 @@ async def create_user(username: str, password: str) -> str:
             "password": password,
             "admin_key": "09g25e02fha9ca"
         }
-    
+
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{url}/user/sign_up", params=data) as response:
+        async with session.post(f"{url}/user/sign_up", data=data) as response:
             # Warten auf die Antwort und den JSON-Inhalt extrahieren
             response_data = await response.json()  # Dies gibt ein Dictionary zurück
             return response_data.get("access_token")
 
 def delete_user(username: str, password: str):
-    params = {"username": username, "password": password}
+    data = {"username": username, "password": password}
     # Teardown after tests (delete user)
-    requests.post(f"{url}/user/delete", params=params)
+    requests.post(f"{url}/user/delete", data=data)
 
 
 @pytest.mark.asyncio
@@ -46,8 +46,8 @@ async def test_websocket_connection_create_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("collection_id")
-    
+    collection_id = response_data.get("id")
+
     # when
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(uri, headers=headers2) as websocket:
@@ -59,7 +59,7 @@ async def test_websocket_connection_create_item():
             async def create_item():
                 post_url = f"{url}/collections/{collection_id}/item"
                 async with session.post(post_url, headers=headers1, json=item_data) as response:
-                    assert response.status == status.HTTP_200_OK     
+                    assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())
@@ -79,7 +79,7 @@ async def test_websocket_connection_create_item():
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
 
-    # then                
+    # then
     data = json.loads(event_response)
 
     assert data["event"] == "created"
@@ -102,14 +102,14 @@ async def test_websocket_connection_edit_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("collection_id")
+    collection_id = response_data.get("id")
 
     response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers2, json=item_data)
     response_data = response.json()
-    item_id = response_data.get("item_id")
+    item_id = response_data.get("id")
 
     item_data = {"name": "test_item_edited", "description": "This is a test item"}
-    
+
     # when
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(uri, headers=headers2) as websocket:
@@ -121,7 +121,7 @@ async def test_websocket_connection_edit_item():
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.put(post_url, headers=headers1, json=item_data) as response:
-                    assert response.status == status.HTTP_200_OK     
+                    assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())
@@ -141,7 +141,7 @@ async def test_websocket_connection_edit_item():
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
 
-    # then                
+    # then
     data = json.loads(event_response)
 
     assert data["event"] == "edited"
@@ -163,12 +163,12 @@ async def test_websocket_connection_remove_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("collection_id")
+    collection_id = response_data.get("id")
 
     response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers2, json=item_data)
     response_data = response.json()
-    item_id = response_data.get("item_id")
-    
+    item_id = response_data.get("id")
+
     # when
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(uri, headers=headers2) as websocket:
@@ -180,7 +180,7 @@ async def test_websocket_connection_remove_item():
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.delete(post_url, headers=headers1) as response:
-                    assert response.status == status.HTTP_200_OK     
+                    assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
             await asyncio.create_task(subscribe_user())
@@ -200,11 +200,11 @@ async def test_websocket_connection_remove_item():
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
 
-    # then                
+    # then
     data = json.loads(event_response)
 
     assert data["event"] == "removed"
-    assert data["item_id"] != None
+    assert data["id"] != None
 
     delete_user(username1, password)
     delete_user(username2, password)

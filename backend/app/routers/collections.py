@@ -79,7 +79,7 @@ def create_table(collection_name: str, purpose: str, current_user: User = Depend
         upsert=True  # Erstellt den Eintrag, falls er noch nicht existiert
     )
 
-    return {"message": f"Collection '{collection_name}' created successfully", "collection_id": str(collection_id)}
+    return {"message": f"Collection '{collection_name}' created successfully", "id": str(collection_id)}
 
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
@@ -97,7 +97,7 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
     redis_key = f"collection_cache:{collection_id}"
     redis_client.delete(redis_key)
 
-    return {"message": f"Collection '{collection_id}' deleted successfully"}
+    return {"message": f"Collection deleted successfully",  "id": collection_id}
 
 @router.get("/{collection_id}/info")
 def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
@@ -120,7 +120,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not owner of collection")
 
-    return {"message": f"Collection '{collection_id}' shared with user '{user_id}'"}
+    return {"message": f"Collection shared with user '{user_id}'",  "id": collection_id}
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
@@ -135,7 +135,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return {"message": f"User '{user_id}' removed from collection '{collection_id}'"}
+    return {"message": f"User '{user_id}' removed from collection", "id": collection_id}
 
 
 ## item methods -------------------------------------------------------------------------
@@ -193,7 +193,7 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
 
     # Return the inserted item's ID
-    return {"message": "Item created", "item_id": item_id}
+    return {"message": "Item created", "id": item_id}
 
 
 # MongoDB: Einzelnes Item bearbeiten
@@ -220,7 +220,7 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
 
-    return {"message": "Item updated"}
+    return {"message": "Item updated", "id": item_id}
 
 
 # MongoDB: Einzelnes Item löschen
@@ -238,9 +238,9 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
     update_modified_status_of_collection(collection_id)
 
     # Publish a WebSocket notification
-    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "item_id": f"{item_id}"}))
+    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
 
-    return {"message": "Item deleted"}
+    return {"message": "Item deleted", "id": item_id}
 
 
 ## helper methods -------------------------------------------------------------------------
@@ -269,6 +269,10 @@ def get_collection_id(collection_name, user_id, should_exist: bool = True):
     return collection["id"] if collection else None
 
 def update_modified_status_of_collection(collection_id):
+
+    redis_key = f"collection_cache:{collection_id}"
+    redis_client.delete(redis_key)
+
     db.users_collections.update_one(
         {"id": collection_id},
         {"$set": {"last_modified": datetime.now().isoformat()}}
