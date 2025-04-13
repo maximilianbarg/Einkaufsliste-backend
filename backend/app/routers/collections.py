@@ -51,8 +51,8 @@ def get_collections(current_user: User = Depends(get_current_active_user)):
 ## collection methods -------------------------------------------------------------------------
 
 # MongoDB: Tabelle dynamisch erstellen
-@router.post("/create/{collection_name}")
-def create_table(collection_name: str, current_user: User = Depends(get_current_active_user)):
+@router.post("/create/{collection_name}/{purpose}")
+def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user)):
     # get user id
     user_id = current_user.username
     #create collection id
@@ -71,7 +71,8 @@ def create_table(collection_name: str, current_user: User = Depends(get_current_
             "$set": {
                 "id": collection_id,  # Collection-ID speichern
                 "owner": user_id,  # Besitzer speichern
-                "last_modified": datetime.now().isoformat()  # datum speichern
+                "last_modified": datetime.now().isoformat(),  # datum speichern
+                "purpose": purpose
             },
             "$addToSet": {"users": user_id}  # Benutzer nur hinzufügen, falls noch nicht vorhanden
         },
@@ -157,7 +158,8 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
 
     # ObjectId in String umwandeln
     for item in data:
-        item["_id"] = str(item["_id"])
+        item["id"] = str(item["_id"])
+        del item["_id"]
 
     data_json = {"name": collection_name, "data": data}
 
