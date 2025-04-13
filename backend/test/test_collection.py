@@ -13,7 +13,7 @@ class TestCollectionAPI:
 
     def teardown_method(self):
         """Delete the user after each test"""
-        requests.post(f"{url}/user/delete", params=self.data)
+        requests.post(f"{url}/user/delete", data=self.data)
 
     def authenticate(self) -> str:
         response = requests.post(f"{url}/token", data=self.data)
@@ -170,6 +170,6 @@ class TestCollectionAPI:
             "admin_key": "09g25e02fha9ca"
         }
 
-        response = requests.post(f"{url}/user/sign_up", params=data)
+        response = requests.post(f"{url}/user/sign_up", data=data)
 
         return response.json().get("access_token")

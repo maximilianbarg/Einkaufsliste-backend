@@ -23,15 +23,15 @@ async def create_user(username: str, password: str) -> str:
         }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{url}/user/sign_up", params=data) as response:
+        async with session.post(f"{url}/user/sign_up", data=data) as response:
             # Warten auf die Antwort und den JSON-Inhalt extrahieren
             response_data = await response.json()  # Dies gibt ein Dictionary zurück
             return response_data.get("access_token")
 
 def delete_user(username: str, password: str):
-    params = {"username": username, "password": password}
+    data = {"username": username, "password": password}
     # Teardown after tests (delete user)
-    requests.post(f"{url}/user/delete", params=params)
+    requests.post(f"{url}/user/delete", data=data)
 
 
 @pytest.mark.asyncio
