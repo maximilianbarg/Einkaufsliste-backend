@@ -158,7 +158,8 @@ class TestCollectionAPI:
 
         # then
         assert response.status_code == status.HTTP_200_OK
-        assert response.json() == {"message": f"Collection '{collection_id}' deleted successfully"}
+        assert response.json()["message"] == "Collection deleted successfully"
+        assert response.json()["id"] == collection_id
 
     def create_user(self) -> str:
         # create user

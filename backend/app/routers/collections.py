@@ -238,7 +238,7 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
     update_modified_status_of_collection(collection_id)
 
     # Publish a WebSocket notification
-    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "item_id": f"{item_id}"}))
+    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
 
     return {"message": "Item deleted", "id": item_id}
 
