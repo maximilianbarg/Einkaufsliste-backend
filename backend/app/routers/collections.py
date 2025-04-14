@@ -109,7 +109,7 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
-def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+def share_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
     result = db.users_collections.update_one(
@@ -124,7 +124,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
-def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+def unshare_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
     result = db.users_collections.update_one(
