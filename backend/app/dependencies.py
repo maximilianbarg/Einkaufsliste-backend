@@ -145,6 +145,17 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
 ## endpoints
 
 # Geschützter Endpunkt
+@router.get("/user/all")
+async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
+    users = list(db["users"].find())
+
+    for user in users:
+        del user["_id"]
+        del user["disabled"]
+        del user["hashed_password"]
+
+    return users
+
 @router.get("/user/me", response_model=user.User)
 async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
     return current_user
