@@ -109,7 +109,7 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
-def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+def share_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
     result = db.users_collections.update_one(
@@ -124,7 +124,7 @@ def delete_table(collection_id: str, user_id: str, current_user: User = Depends(
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
-def delete_table(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+def unshare_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
     result = db.users_collections.update_one(
@@ -187,7 +187,8 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
 
     # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
     if created_item:
-        created_item["_id"] = str(created_item["_id"])  # ObjectId in String umwandeln
+        created_item["id"] = str(created_item["_id"])  # ObjectId in String umwandeln
+        del created_item["_id"]
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
@@ -215,7 +216,8 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
 
     # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
     if updated_item:
-        updated_item["_id"] = str(updated_item["_id"])  # ObjectId in String umwandeln
+        updated_item["id"] = str(updated_item["_id"])  # ObjectId in String umwandeln
+        del updated_item["_id"]
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
