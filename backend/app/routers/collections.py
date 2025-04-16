@@ -1,13 +1,14 @@
-from fastapi import HTTPException, Depends, APIRouter, status
+from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
 import bson
-from typing import Collection, Dict
-from datetime import datetime
+from typing import Collection, Dict, Optional
+from datetime import datetime, timezone
 
 from ..connection_manager import ConnectionManager
 from ..dependencies import user, get_current_active_user
 from ..dbclient import DbClient
+from ..collection_filter import parse_filter_string
 
 router = APIRouter(
     prefix="/collections",
@@ -71,7 +72,7 @@ def create_table(collection_name: str, purpose: str, current_user: User = Depend
             "$set": {
                 "id": collection_id,  # Collection-ID speichern
                 "owner": user_id,  # Besitzer speichern
-                "last_modified": datetime.now().isoformat(),  # datum speichern
+                "last_modified": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),  # datum speichern
                 "purpose": purpose
             },
             "$addToSet": {"users": user_id}  # Benutzer nur hinzufügen, falls noch nicht vorhanden
@@ -94,7 +95,7 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
     db.drop_collection(collection_id)
 
     #remove cached item
-    redis_key = f"collection_cache:{collection_id}"
+    redis_key = f"collection_cache:{collection_id}_no_filter"
     redis_client.delete(redis_key)
 
     return {"message": f"Collection deleted successfully",  "id": collection_id}
@@ -141,9 +142,15 @@ def unshare_collection(collection_id: str, user_id: str, current_user: User = De
 ## item methods -------------------------------------------------------------------------
 
 @router.get("/{collection_id}/items")
-def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
+def get_items(
+    collection_id: str,
+    filter: Optional[str] = Query(
+        None,
+        description="Filter-String wie 'price>2,price<7,name:Apfel'"
+    ),
+    current_user: User = Depends(get_current_active_user)):
     # 1. In Redis nachsehen
-    redis_key = f"collection_cache:{collection_id}"
+    redis_key = f"collection_cache:{collection_id}:{filter or ''}"
     cached_data = redis_client.get(redis_key)
     if cached_data:
         # Daten aus Redis zurückgeben
@@ -154,7 +161,8 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
     collection_name = get_collection_info(collection_id)["collection_name"]
 
     # get items
-    data = list(collection.find())
+    mongo_filter = parse_filter_string(filter)
+    data = list(collection.find(mongo_filter))
 
     # ObjectId in String umwandeln
     for item in data:
