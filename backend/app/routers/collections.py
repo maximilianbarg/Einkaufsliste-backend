@@ -2,7 +2,9 @@ from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
 import bson
-from typing import Collection, Dict, Optional
+from pymongo.collection import Collection
+from redis import Redis
+from typing import Dict, Optional
 from datetime import datetime, timezone
 
 from ..connection_manager import ConnectionManager
@@ -23,8 +25,8 @@ User = user.User
 
 # get db and redis
 db_client = DbClient()
-db = db_client.db
-redis_client = db_client.redis_client
+db: Collection = db_client.db
+redis_client: Redis = db_client.redis_client
 
 # Manager-Instanz erstellen
 sockets = ConnectionManager()
@@ -148,21 +150,44 @@ def get_items(
         None,
         description="Filter-String wie 'price>2,price<7,name:Apfel'"
     ),
+    sort: Optional[str] = Query(
+        None,
+        description="Sort-String wie 'price=asc' oder 'name=dsc,price=asc'"
+    ),
+    skip: Optional[str] = Query(
+        None,
+        description="Skip-String wie '10'"
+    ),
+    limit: Optional[str] = Query(
+        None,
+        description="Limit-String wie '50'"
+    ),
     current_user: User = Depends(get_current_active_user)):
     # 1. In Redis nachsehen
-    redis_key = f"collection_cache:{collection_id}:{filter or ''}"
+    redis_key = f"collection_cache:{collection_id}:{filter or ''}:{sort or ''}:{skip or ''}:{limit or ''}"
     cached_data = redis_client.get(redis_key)
     if cached_data:
         # Daten aus Redis zurückgeben
         return {"source": "cache"} | json.loads(cached_data)
 
     # get collection
-    collection = get_collection_by_id(collection_id)
+    collection: Collection = get_collection_by_id(collection_id)
     collection_name = get_collection_info(collection_id)["collection_name"]
 
     # get items
     mongo_filter = parse_filter_string(filter)
-    data = list(collection.find(mongo_filter))
+    items = collection.find(mongo_filter)
+
+    if sort:
+        items = items.sort(parse_filter_string(sort))
+
+    if limit:
+        items = items.limit(int(limit))
+
+    if skip:
+        items = items.skip(int(skip))
+
+    data = list(items)
 
     # ObjectId in String umwandeln
     for item in data:
@@ -180,7 +205,7 @@ def get_items(
 @router.post("/{collection_id}/item")
 def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
     # get collection
-    collection = get_collection_by_id(collection_id)
+    collection: Collection = get_collection_by_id(collection_id)
 
     # Insert the item into the collection
     result = collection.insert_one(item)

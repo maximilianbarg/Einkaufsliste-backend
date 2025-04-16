@@ -1,3 +1,6 @@
+
+from pymongo import ASCENDING, DESCENDING
+
 def parse_filter_string(filter_string: str):
     OPERATORS = {
         ">=": "$gte",
@@ -27,6 +30,10 @@ def parse_filter_string(filter_string: str):
                     value = True
                 elif lower_val == "false":
                     value = False
+                elif lower_val == "asc":
+                    value = ASCENDING
+                elif lower_val == "dsc":
+                    value = DESCENDING
                 else:
                     try:
                         if "." in value:
