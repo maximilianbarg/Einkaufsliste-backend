@@ -37,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: api.dockerfile
+      args:
+        DEBUG: ${DEBUG}
     restart: always
     ports:
       - "8000:8000"
@@ -48,6 +50,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_KEY: ${ADMIN_KEY}
       DEBUG: ${DEBUG}
+    env_file:
+      - .env
     depends_on:
       - mongodb
       - redis
