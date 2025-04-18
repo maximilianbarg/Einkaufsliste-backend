@@ -42,7 +42,7 @@ async def test_websocket_connection_create_item():
 
     headers2 = {"Authorization": f"Bearer {access_token_user_2}"}
     headers1 = {"Authorization": f"Bearer {access_token_user_1}"}
-    response = requests.post(f"{url}/collections/create/test_collection", headers=headers2)
+    response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers2)
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
@@ -98,7 +98,7 @@ async def test_websocket_connection_edit_item():
 
     headers2 = {"Authorization": f"Bearer {access_token_user_2}"}
     headers1 = {"Authorization": f"Bearer {access_token_user_1}"}
-    response = requests.post(f"{url}/collections/create/test_collection", headers=headers2)
+    response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers2)
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
@@ -159,7 +159,7 @@ async def test_websocket_connection_remove_item():
 
     headers2 = {"Authorization": f"Bearer {access_token_user_2}"}
     headers1 = {"Authorization": f"Bearer {access_token_user_1}"}
-    response = requests.post(f"{url}/collections/create/test_collection", headers=headers2)
+    response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers2)
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()

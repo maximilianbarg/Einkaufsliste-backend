@@ -31,32 +31,32 @@ class ConnectionManager:
             del self.active_connections[user_id]
 
     # Nachricht an eine spezifische Verbindung senden
-    def send_to_user(self, user_id: str, message: str):
+    async def send_to_user(self, user_id: str, message: str):
         websocket = self.active_connections.get(user_id)
         if websocket:
-            asyncio.run(websocket.send_text(message))
+            await websocket.send_text(message)
         else:
             print(f"User {user_id} is not connected.")
 
     # Broadcast an alle Verbindungen senden
-    def send_to_broadcast(self, user_id: str, message: str):
+    async def send_to_broadcast(self, user_id: str, message: str):
         for connection in self.active_connections.values():
             if connection.user == user_id:
                 continue
             try:
-                asyncio.run(connection.send_text(message))
+                await connection.send_text(message)
             except WebSocketDisconnect:
                 self.disconnect(connection)
 
     # Nachricht an eine Gruppe von Benutzern senden
-    def send_to_channel(self, user_id: str, channel_name: str, message: str):
+    async def send_to_channel(self, user_id: str, channel_name: str, message: str):
         # Hole alle Benutzer-IDs in der Gruppe
         channel_user_ids = self.channels.get(channel_name, [])
         for channel_user_id in channel_user_ids:
             if channel_user_id == user_id:
                 continue
             else:
-                self.send_to_user(channel_user_id, message)
+                await self.send_to_user(channel_user_id, message)
 
     # Benutzer zu einer Gruppe hinzufügen
     def add_user_to_channel(self, user_id: str, channel_name: str):

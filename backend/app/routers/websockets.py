@@ -41,28 +41,28 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Beispiel-Endpunkt: Nachricht an alle Benutzer senden (Broadcast)
 @router.post("/broadcast")
-def broadcast_message(message: str):
-    manager.send_to_broadcast(message)
+async def broadcast_message(message: str):
+    await manager.send_to_broadcast(message)
     return {"message": "Broadcast sent to all connected users."}
 
 
 # Beispiel-Endpunkt: Nachricht an eine Gruppe senden
 @router.post("/channel/{channel_name}")
-def send_to_channel(channel_name: str, message: str):
-    manager.send_to_channel(channel_name, message)
+async def send_to_channel(channel_name: str, message: str):
+    await manager.send_to_channel(channel_name, message)
     return {"message": f"Message sent to group {channel_name}."}
 
 
 # Beispiel-Endpunkt: Benutzer zu einer Gruppe hinzufügen
 @router.post("/channel/{channel_name}/subscribe")
-def add_user_to_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
+async def add_user_to_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
     manager.add_user_to_channel(current_user.username, channel_name)
     return {"message": f"User {current_user.username} added to group {channel_name}."}
 
 
 # Beispiel-Endpunkt: Benutzer aus einer Gruppe entfernen
 @router.post("/channel/{channel_name}/unsubscribe")
-def remove_user_from_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
+async def remove_user_from_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
     manager.remove_user_from_channel(current_user.username, channel_name)
     return {"message": f"User {current_user.username} removed from group {channel_name}."}
 

@@ -2,13 +2,14 @@ fastapi[standard]==0.115.6
 websockets==14.1
 uvicorn==0.34.0
 pymongo==4.10.1
+motor==3.7.0
 redis==5.2.1
 python-jose==3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.0
 pydantic==2.10.4
 python-multipart==0.0.20
-debugpy
 asyncio==3.4.3
+uvloop==0.21.0
 prometheus-fastapi-instrumentator==1.1.1
 python-logging-loki==0.3.1

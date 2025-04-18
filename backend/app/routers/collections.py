@@ -2,6 +2,7 @@ from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
 import bson
+from pymongo.database import Database
 from pymongo.collection import Collection
 from redis import Redis
 from typing import Dict, Optional
@@ -25,7 +26,7 @@ User = user.User
 
 # get db and redis
 db_client = DbClient()
-db: Collection = db_client.db
+db: Database = db_client.db
 redis_client: Redis = db_client.redis_client
 
 # Manager-Instanz erstellen
@@ -35,14 +36,14 @@ sockets = ConnectionManager()
 ## user collections -------------------------------------------------------------------------
 
 @router.get("/list")
-def get_collections(current_user: User = Depends(get_current_active_user)):
+async def get_collections(current_user: User = Depends(get_current_active_user)):
     # get collection
     collections = db.users_collections.find({"users": current_user.username})
 
     # get items
-    data = list(collections)
+    data = await collections.to_list(length=None)
 
-    # ObjectId in String umwandeln
+    # Entfernen von _id aus jedem Element
     for item in data:
         del item["_id"]
 
@@ -55,20 +56,20 @@ def get_collections(current_user: User = Depends(get_current_active_user)):
 
 # MongoDB: Tabelle dynamisch erstellen
 @router.post("/create/{collection_name}/{purpose}")
-def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user)):
+async def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user)):
     # get user id
     user_id = current_user.username
     #create collection id
     collection_id = str(bson.ObjectId())
 
     # check if collection already exists
-    get_collection_in_db(collection_name, user_id)
+    await get_collection_in_db(collection_name, user_id)
 
     # Collection erstellen
-    db.create_collection(collection_id)
+    await db.create_collection(collection_id)
 
     # Den Benutzer zur `users_collections`-Tabelle hinzufügen
-    db.users_collections.update_one(
+    await db.users_collections.update_one(
         {"collection_name": collection_name},
         {
             "$set": {
@@ -86,15 +87,15 @@ def create_table(collection_name: str, purpose: str, current_user: User = Depend
 
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
-def delete_table(collection_id: str, current_user: User = Depends(get_current_active_user)):
+async def delete_table(collection_id: str, current_user: User = Depends(get_current_active_user)):
 
     # delete from users list
-    db.users_collections.find_one_and_delete(
+    await db.users_collections.find_one_and_delete(
         {"id": collection_id}
     )
 
     # delete list
-    db.drop_collection(collection_id)
+    await db.drop_collection(collection_id)
 
     #remove cached item
     redis_key = f"collection_cache:{collection_id}_no_filter"
@@ -103,8 +104,8 @@ def delete_table(collection_id: str, current_user: User = Depends(get_current_ac
     return {"message": f"Collection deleted successfully",  "id": collection_id}
 
 @router.get("/{collection_id}/info")
-def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
-    collection_info = get_collection_info(collection_id)
+async def get_items(collection_id: str, current_user: User = Depends(get_current_active_user)):
+    collection_info = await get_collection_info(collection_id)
 
     del collection_info["_id"]
 
@@ -112,10 +113,10 @@ def get_items(collection_id: str, current_user: User = Depends(get_current_activ
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
-def share_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+async def share_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
-    result = db.users_collections.update_one(
+    result = await db.users_collections.update_one(
         {"id": collection_id, "owner": current_user.username},
         {"$addToSet": {"users": user_id}}
     )
@@ -127,10 +128,10 @@ def share_collection(collection_id: str, user_id: str, current_user: User = Depe
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
-def unshare_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+async def unshare_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
 
     # add user to list
-    result = db.users_collections.update_one(
+    result = await db.users_collections.update_one(
         {"id": collection_id, "owner": current_user.username},
         {"$pull": {"users": user_id}}
     )
@@ -144,7 +145,7 @@ def unshare_collection(collection_id: str, user_id: str, current_user: User = De
 ## item methods -------------------------------------------------------------------------
 
 @router.get("/{collection_id}/items")
-def get_items(
+async def get_items(
     collection_id: str,
     filter: Optional[str] = Query(
         None,
@@ -162,7 +163,8 @@ def get_items(
         None,
         description="Limit-String wie '50'"
     ),
-    current_user: User = Depends(get_current_active_user)):
+    current_user: User = Depends(get_current_active_user)
+    ):
     # 1. In Redis nachsehen
     redis_key = f"collection_cache:{collection_id}:{filter or ''}:{sort or ''}:{skip or ''}:{limit or ''}"
     cached_data = redis_client.get(redis_key)
@@ -171,8 +173,8 @@ def get_items(
         return {"source": "cache"} | json.loads(cached_data)
 
     # get collection
-    collection: Collection = get_collection_by_id(collection_id)
-    collection_name = get_collection_info(collection_id)["collection_name"]
+    collection: Collection = await get_collection_by_id(collection_id)
+    collection_name = (await get_collection_info(collection_id))["collection_name"]
 
     # get items
     mongo_filter = parse_filter_string(filter)
@@ -187,7 +189,7 @@ def get_items(
     if skip:
         items = items.skip(int(skip))
 
-    data = list(items)
+    data = await items.to_list(length=None)
 
     # ObjectId in String umwandeln
     for item in data:
@@ -203,20 +205,20 @@ def get_items(
 
 # MongoDB: Einzelnes Item erstellen
 @router.post("/{collection_id}/item")
-def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
+async def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
     # get collection
-    collection: Collection = get_collection_by_id(collection_id)
+    collection: Collection = await get_collection_by_id(collection_id)
 
     # Insert the item into the collection
-    result = collection.insert_one(item)
+    result = await collection.insert_one(item)
 
     # update modified date
-    update_modified_status_of_collection(collection_id)
+    await update_modified_status_of_collection(collection_id)
 
     item_id = str(result.inserted_id)
 
     # Das aktualisierte Item abrufen
-    created_item = collection.find_one({"_id": ObjectId(item_id)})
+    created_item = await collection.find_one({"_id": ObjectId(item_id)})
 
     # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
     if created_item:
@@ -232,20 +234,20 @@ def create_item(collection_id: str, item: Dict, current_user: User = Depends(get
 
 # MongoDB: Einzelnes Item bearbeiten
 @router.put("/{collection_id}/item/{item_id}")
-def update_item(collection_id: str, item_id: str, updates: Dict, current_user: User = Depends(get_current_active_user)):
+async def update_item(collection_id: str, item_id: str, updates: Dict, current_user: User = Depends(get_current_active_user)):
     # get collection
-    collection = get_collection_by_id(collection_id)
+    collection = await get_collection_by_id(collection_id)
     # update item
-    result = collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
+    result = await collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
 
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # update modified date
-    update_modified_status_of_collection(collection_id)
+    await update_modified_status_of_collection(collection_id)
 
     # Das aktualisierte Item abrufen
-    updated_item = collection.find_one({"_id": ObjectId(item_id)})
+    updated_item = await collection.find_one({"_id": ObjectId(item_id)})
 
     # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
     if updated_item:
@@ -260,17 +262,17 @@ def update_item(collection_id: str, item_id: str, updates: Dict, current_user: U
 
 # MongoDB: Einzelnes Item löschen
 @router.delete("/{collection_id}/item/{item_id}")
-def delete_item(collection_id: str, item_id: str, current_user: User = Depends(get_current_active_user)):
+async def delete_item(collection_id: str, item_id: str, current_user: User = Depends(get_current_active_user)):
     # get collection
-    collection = get_collection_by_id(collection_id)
+    collection = await get_collection_by_id(collection_id)
     # delete item
-    result = collection.delete_one({"_id": ObjectId(item_id)})
+    result = await collection.delete_one({"_id": ObjectId(item_id)})
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # update modified date
-    update_modified_status_of_collection(collection_id)
+    await update_modified_status_of_collection(collection_id)
 
     # Publish a WebSocket notification
     sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
@@ -280,18 +282,18 @@ def delete_item(collection_id: str, item_id: str, current_user: User = Depends(g
 
 ## helper methods -------------------------------------------------------------------------
 
-def get_collection_by_id(collection_id: str) -> Collection:
+async def get_collection_by_id(collection_id: str) -> Collection:
     return db[collection_id]
 
-def get_collection_info(collection_id) -> Dict:
-    return db.users_collections.find_one({"id": collection_id})
+async def get_collection_info(collection_id) -> Dict:
+    return await db.users_collections.find_one({"id": collection_id})
 
-def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
-    collection_id = get_collection_id(collection_name, user_id, False)
+async def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
+    collection_id = await get_collection_id(collection_name, user_id, False)
     return db[collection_id] if collection_id else None
 
-def get_collection_id(collection_name, user_id, should_exist: bool = True):
-    collection = db.users_collections.find_one(
+async def get_collection_id(collection_name, user_id, should_exist: bool = True):
+    collection = await db.users_collections.find_one(
         {"collection_name": collection_name, "users": user_id}
     )
 
@@ -303,12 +305,11 @@ def get_collection_id(collection_name, user_id, should_exist: bool = True):
 
     return collection["id"] if collection else None
 
-def update_modified_status_of_collection(collection_id):
-
+async def update_modified_status_of_collection(collection_id):
     redis_key = f"collection_cache:{collection_id}"
     redis_client.delete(redis_key)
 
-    db.users_collections.update_one(
+    await db.users_collections.update_one(
         {"id": collection_id},
         {"$set": {"last_modified": datetime.now().isoformat()}}
     )

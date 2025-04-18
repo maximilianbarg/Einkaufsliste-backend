@@ -8,8 +8,19 @@ from .dependencies import router
 from contextlib import asynccontextmanager
 from .service_loader import load_services
 from .own_logger import get_logger
+import debugpy
+
+
+# Setze uvloop als Event-Loop-Policy
+import asyncio
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = get_logger()
+
+debugpy.listen(("0.0.0.0", 5678))  # Höre auf allen Netzwerkschnittstellen
+logger.info("Waiting for debugger attach...")
+debugpy.wait_for_client()  # Wartet, bis der Debugger verbunden ist
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,5 +53,5 @@ app.include_router(websockets.router)
 
 # Root-Endpunkt
 @app.get("/")
-def root():
+async def root():
     return {"message": "Einkaufsliste Backend is running!"}
