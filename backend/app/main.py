@@ -1,5 +1,8 @@
 import os
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
 from .routers import collections, websockets
 from .dependencies import router
 from contextlib import asynccontextmanager
@@ -18,8 +21,17 @@ async def lifespan(app: FastAPI):
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
 
-DEBUG = os.getenv("Debug", "false")
-app.debug = True if(DEBUG == "true") else False
+# Prometheus metrics
+logger.info("Starting Prometheus metrics...")
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    excluded_handlers=[".*admin.*", "/metrics"],
+)
+instrumentator.instrument(app).expose(app)
+
+DEBUG = os.getenv("Debug", 0)
+app.debug = True if(DEBUG == 1) else False
 
 app.include_router(router)
 app.include_router(collections.router)

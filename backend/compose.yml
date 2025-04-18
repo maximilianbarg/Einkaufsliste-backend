@@ -1,4 +1,6 @@
-version: '3.8'
+networks:
+  app:
+    driver: bridge
 
 services:
   mongodb:
@@ -13,6 +15,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     mem_limit: 1g
+    networks:
+      - app
 
   redis:
     image: redis:6.2
@@ -24,6 +28,8 @@ services:
       - ./data/redis-data:/data
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
     mem_limit: 512m
+    networks:
+      - app
 
   backend:
     image: einkaufsliste_backend
@@ -46,3 +52,60 @@ services:
       - mongodb
       - redis
     mem_limit: 1g
+    networks:
+      - app
+
+  # debug only
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./data/grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana-dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml # dashboard setting
+      - ./grafana-dashboards:/etc/grafana/dashboards # dashboard json files directory
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./promtail.yml:/etc/promtail/docker-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/docker-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}

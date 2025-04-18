@@ -10,3 +10,5 @@ pydantic==2.10.4
 python-multipart==0.0.20
 debugpy
 asyncio==3.4.3
+prometheus-fastapi-instrumentator==1.1.1
+python-logging-loki==0.3.1
