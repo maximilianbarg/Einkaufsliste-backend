@@ -152,7 +152,7 @@ def get_items(
     ),
     sort: Optional[str] = Query(
         None,
-        description="Sort-String wie 'price=asc' oder 'name=dsc,price=asc'"
+        description="Sort-String wie 'price=asc' oder 'name=desc,price=asc'"
     ),
     skip: Optional[str] = Query(
         None,

@@ -32,7 +32,7 @@ def parse_filter_string(filter_string: str):
                     value = False
                 elif lower_val == "asc":
                     value = ASCENDING
-                elif lower_val == "dsc":
+                elif lower_val == "desc":
                     value = DESCENDING
                 else:
                     try:
