@@ -18,9 +18,11 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = get_logger()
 
-debugpy.listen(("0.0.0.0", 5678))  # Höre auf allen Netzwerkschnittstellen
-logger.info("Waiting for debugger attach...")
-debugpy.wait_for_client()  # Wartet, bis der Debugger verbunden ist
+## debug only
+
+#debugpy.listen(("0.0.0.0", 5678))  # Höre auf allen Netzwerkschnittstellen
+#logger.info("Waiting for debugger attach...")
+#debugpy.wait_for_client()  # Wartet, bis der Debugger verbunden ist
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
