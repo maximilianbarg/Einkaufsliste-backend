@@ -1,5 +1,5 @@
 import bson
-from fastapi import HTTPException, Depends, APIRouter, status, Form
+from fastapi import HTTPException, Depends, APIRouter, status, Form, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -177,7 +177,7 @@ async def sign_up_for_access_token(username: str = Form(...), fullname: str = Fo
 
 # Nutzer entfernen
 @router.post("/user/delete")
-async def delete_user(username: str = Form(...), password: str = Form(...)):
+async def delete_user(background_tasks: BackgroundTasks, username: str = Form(...), password: str = Form(...)):
     user = await authenticate_user(username, password)
     if not user:
         raise HTTPException(
@@ -186,7 +186,8 @@ async def delete_user(username: str = Form(...), password: str = Form(...)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    await delete_user_in_db(username)
+    background_tasks.add_task(delete_user_in_db, username)
+    
     return {"message": "user deleted"}
 
 # Authentifizierung: Token-Endpunkt
