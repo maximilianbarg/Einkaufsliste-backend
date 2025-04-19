@@ -50,6 +50,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_KEY: ${ADMIN_KEY}
       DEBUG: ${DEBUG}
+    volumes:
+      - ./backend.log:/backend.log
     env_file:
       - .env
     depends_on:

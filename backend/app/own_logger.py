@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format=log_format,
     handlers=[
-        logging.FileHandler("backend.log"),
+        logging.FileHandler("/backend.log"),
         logging.StreamHandler()
     ]
 )
