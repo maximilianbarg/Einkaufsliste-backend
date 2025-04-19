@@ -24,11 +24,24 @@ class DbClient:
             logger.info("Connect to Database...")
             # Umgebungsvariablen abrufen
             self.redis_host = os.getenv("REDIS_HOST", "localhost")
-            self.redis_client: Redis = Redis(host=self.redis_host, port=6379, decode_responses=True)
-
             self.mongo_uri = os.getenv("MONGO_URI", "MONGO_URI")
-            self.mongo_client = AsyncIOMotorClient(self.mongo_uri)
-            self.db: Database = self.mongo_client[os.getenv("MONGO_DATABASE", "my_database")]
+            self.mongo_db = os.getenv("MONGO_DATABASE", "my_database")
+
+            self.redis_client = Redis(
+                host=self.redis_host,
+                port=6379,
+                decode_responses=True,
+                max_connections=6,
+            )
+
+            self.mongo_client = AsyncIOMotorClient(
+                self.mongo_uri,
+                maxPoolSize=6,
+                minPoolSize=2,
+                serverSelectionTimeoutMS=5000,
+            )
+
+            self.db: Database = self.mongo_client[self.mongo_db]
 
             self.initialized = True
 
