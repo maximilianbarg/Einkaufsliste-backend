@@ -237,16 +237,13 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     # get collection
     collection = await get_collection_by_id(collection_id)
     # update item
-    result = await collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
+    updated_item = await collection.find_one_and_update({"_id": ObjectId(item_id)}, {"$set": updates})
 
-    if result.matched_count == 0:
+    if updated_item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # update modified date
     await update_modified_status_of_collection(collection_id)
-
-    # Das aktualisierte Item abrufen
-    updated_item = await collection.find_one({"_id": ObjectId(item_id)})
 
     # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
     if updated_item:
