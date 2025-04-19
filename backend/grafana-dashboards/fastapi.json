@@ -99,7 +99,7 @@
           "includeNullMetadata": true,
           "instant": true,
           "interval": "",
-          "legendFormat": "{{method}}",
+          "legendFormat": "{{method}} {{handler}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -262,14 +262,18 @@
             "type": "prometheus",
             "uid": "PBFA97CFB590B2093"
           },
-          "editorMode": "code",
+          "disableTextWrap": false,
+          "editorMode": "builder",
           "exemplar": true,
           "expr": "sum(http_request_duration_seconds_count{app_name=\"$app_name\", handler!=\"/metrics\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "instant": true,
           "interval": "",
           "legendFormat": "",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "timeFrom": "24h",
@@ -427,7 +431,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "sum by(type) (rate({service_name=~\"einkaufsliste_backend\"} | pattern `<date> <time> <type> <logger> <code> [<_>=<trace_id> <_>=<span_id> <_>=<service_name>] - <msg>` | type != `` |= `$log_keyword` [1m]))",
+          "expr": "sum by(type) (rate({service_name=~\"einkaufsliste_backend\"} | pattern `<date> <time> <type> <logger> <code> [<_>=<trace_id> <_>=<span_id> <_>=<service_name>] - <msg>` | type =~ `[PGD][AEUO][LSTC].*` |= `$log_keyword` [1m]))",
           "legendFormat": "{{type}}",
           "queryType": "range",
           "refId": "A"
@@ -773,13 +777,44 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "{application=~\"einkaufsliste_backend\"}",
+          "expr": "{application=\"einkaufsliste_backend\"} != `event`",
           "hide": false,
+          "legendFormat": "",
           "queryType": "range",
           "refId": "A"
         }
       ],
       "title": "Log of All FastAPI App",
+      "transformations": [
+        {
+          "disabled": true,
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "format": "auto",
+            "keepTime": false,
+            "replace": true,
+            "source": "Line"
+          }
+        },
+        {
+          "disabled": true,
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "client": true,
+              "headers": true,
+              "status_code": false,
+              "url": true,
+              "user-agent": true,
+              "x-prometheus-scrape-timeout-seconds": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
       "type": "logs"
     }
   ],
@@ -839,5 +874,5 @@
   "timezone": "",
   "title": "FastAPI Observability",
   "uid": "fastapi-observability",
-  "version": 1
+  "version": 6
 }
