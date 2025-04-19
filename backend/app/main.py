@@ -1,11 +1,11 @@
 import os
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
+from contextlib import asynccontextmanager
 
-
+from .dbclient import DbClient
 from .routers import collections, websockets
 from .dependencies import router
-from contextlib import asynccontextmanager
 from .service_loader import load_services
 from .own_logger import get_logger
 import debugpy
@@ -20,16 +20,19 @@ logger = get_logger()
 
 ## debug only
 
-#debugpy.listen(("0.0.0.0", 5678))  # Höre auf allen Netzwerkschnittstellen
-#logger.info("Waiting for debugger attach...")
+debugpy.listen(("0.0.0.0", 5678))  # Höre auf allen Netzwerkschnittstellen
+logger.info("Waiting for debugger attach...")
 #debugpy.wait_for_client()  # Wartet, bis der Debugger verbunden ist
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Connect to Database...")
+    db_client = DbClient()
     logger.info("Starting background services...")
     await load_services()
 
     yield
+    db_client.shutdown()
 
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
