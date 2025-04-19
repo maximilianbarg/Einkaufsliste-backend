@@ -725,7 +725,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "rate(http_request_duration_seconds_sum{app_name=\"$app_name\"}[1m])*250",
+          "expr": "rate(http_request_duration_seconds_sum{app_name=\"$app_name\"}[1m])*10",
           "format": "time_series",
           "instant": false,
           "interval": "",
