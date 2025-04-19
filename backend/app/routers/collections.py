@@ -4,7 +4,6 @@ import json
 import bson
 from pymongo.database import Database
 from pymongo.collection import Collection
-from redis import Redis
 from typing import Dict, Optional
 from datetime import datetime, timezone
 
@@ -27,7 +26,7 @@ User = user.User
 # get db and redis
 db_client = DbClient()
 db: Database = db_client.db
-redis_client: Redis = db_client.redis_client
+redis_client = db_client.redis_client
 
 # Manager-Instanz erstellen
 sockets = ConnectionManager()
@@ -99,7 +98,7 @@ async def delete_table(collection_id: str, current_user: User = Depends(get_curr
 
     #remove cached item
     redis_key = f"collection_cache:{collection_id}_no_filter"
-    redis_client.delete(redis_key)
+    await redis_client.delete(redis_key)
 
     return {"message": f"Collection deleted successfully",  "id": collection_id}
 
@@ -167,7 +166,7 @@ async def get_items(
     ):
     # 1. In Redis nachsehen
     redis_key = f"collection_cache:{collection_id}:{filter or ''}:{sort or ''}:{skip or ''}:{limit or ''}"
-    cached_data = redis_client.get(redis_key)
+    cached_data = await redis_client.get(redis_key)
     if cached_data:
         # Daten aus Redis zurückgeben
         return {"source": "cache"} | json.loads(cached_data)
@@ -199,7 +198,7 @@ async def get_items(
     data_json = {"name": collection_name, "data": data}
 
     # 3. Daten in Redis cachen
-    redis_client.set(redis_key, json.dumps(data_json), ex=cache_time)
+    await redis_client.set(redis_key, json.dumps(data_json), ex=cache_time)
 
     return {"source": "db"} | data_json
 
@@ -307,7 +306,7 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
 
 async def update_modified_status_of_collection(collection_id):
     redis_key = f"collection_cache:{collection_id}"
-    redis_client.delete(redis_key)
+    await redis_client.delete(redis_key)
 
     await db.users_collections.update_one(
         {"id": collection_id},
