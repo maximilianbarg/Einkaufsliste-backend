@@ -51,7 +51,7 @@ services:
       ADMIN_KEY: ${ADMIN_KEY}
       DEBUG: ${DEBUG}
     volumes:
-      - ./backend.log:/backend.log
+      - ./logs:/logs
     env_file:
       - .env
     depends_on:
