@@ -150,6 +150,7 @@ async def test_websocket_connection_edit_item():
     delete_user(username1, password)
     delete_user(username2, password)
 
+#asyncio.run(test_websocket_connection_edit_item())
 
 @pytest.mark.asyncio
 async def test_websocket_connection_remove_item():

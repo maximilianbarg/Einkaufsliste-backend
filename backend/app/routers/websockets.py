@@ -56,7 +56,7 @@ async def send_to_channel(channel_name: str, message: str, current_user: User = 
 # Beispiel-Endpunkt: Benutzer zu einer Gruppe hinzufügen
 @router.post("/channel/{channel_name}/subscribe")
 async def add_user_to_channel(channel_name: str, current_user: User = Depends(get_current_active_user)):
-    manager.add_user_to_channel(current_user.username, channel_name)
+    await manager.add_user_to_channel(current_user.username, channel_name)
     return {"message": f"User {current_user.username} added to group {channel_name}."}
 
 

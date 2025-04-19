@@ -1,6 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.database import Database
 from redis.asyncio import Redis
+from redis.asyncio.client import PubSub
 import os
 
 from .own_logger import get_logger
@@ -10,6 +11,7 @@ logger = get_logger()
 class DbClient:
     db: Database
     redis_client: Redis
+    redis_pub_sub: PubSub
     mongo_client: AsyncIOMotorClient
     
     _instance = None
@@ -42,6 +44,8 @@ class DbClient:
             )
 
             self.db: Database = self.mongo_client[self.mongo_db]
+
+            self.redis_pub_sub = self.redis_client.pubsub()
 
             self.initialized = True
 
