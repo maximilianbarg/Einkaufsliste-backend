@@ -1,7 +1,8 @@
 import asyncio
-from ..own_logger import get_logger
+from ..logger_manager import LoggerManager
 
-logger = get_logger()
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
 
 service_name = "Test Service"
 

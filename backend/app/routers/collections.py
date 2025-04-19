@@ -3,10 +3,11 @@ from bson import ObjectId
 import json
 import bson
 from pymongo.database import Database
-from pymongo.collection import Collection
+from pymongo.collection import Collection, InsertOneResult
 from typing import Dict, Optional
 from datetime import datetime, timezone
 
+from ..logger_manager import LoggerManager
 from ..connection_manager import ConnectionManager
 from ..dependencies import user, get_current_active_user
 from ..dbclient import DbClient
@@ -30,6 +31,10 @@ redis_client = db_client.redis_client
 
 # Manager-Instanz erstellen
 sockets = ConnectionManager()
+
+# Logging
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
 
 
 ## user collections -------------------------------------------------------------------------
@@ -121,6 +126,7 @@ async def share_collection(collection_id: str, user_id: str, current_user: User 
     )
 
     if result.matched_count == 0:
+        logger.warning(f"user {user_id} not added from collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not owner of collection")
 
     return {"message": f"Collection shared with user '{user_id}'",  "id": collection_id}
@@ -136,6 +142,7 @@ async def unshare_collection(collection_id: str, user_id: str, current_user: Use
     )
 
     if result.matched_count == 0:
+        logger.warning(f"user {user_id} not removed from collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return {"message": f"User '{user_id}' removed from collection", "id": collection_id}
@@ -209,7 +216,7 @@ async def create_item(collection_id: str, item: Dict, current_user: User = Depen
     collection: Collection = await get_collection_by_id(collection_id)
 
     # Insert the item into the collection
-    result = await collection.insert_one(item)
+    result: InsertOneResult = await collection.insert_one(item)
 
     # update modified date
     await update_modified_status_of_collection(collection_id)
@@ -240,6 +247,7 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     updated_item = await collection.find_one_and_update({"_id": ObjectId(item_id)}, {"$set": updates})
 
     if updated_item is None:
+        logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # update modified date
@@ -265,6 +273,7 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
     result = await collection.delete_one({"_id": ObjectId(item_id)})
 
     if result.deleted_count == 0:
+        logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # update modified date
@@ -279,10 +288,22 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
 ## helper methods -------------------------------------------------------------------------
 
 async def get_collection_by_id(collection_id: str) -> Collection:
-    return db[collection_id]
+    collection = db[collection_id]
+
+    if not collection:
+        logger.warning(f"Collection {collection_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+    
+    return collection
 
 async def get_collection_info(collection_id) -> Dict:
-    return await db.users_collections.find_one({"id": collection_id})
+    collection_info = await db.users_collections.find_one({"id": collection_id})
+
+    if not collection_info:
+        logger.warning(f"Collection info {collection_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
+    
+    return collection_info
 
 async def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
     collection_id = await get_collection_id(collection_name, user_id, False)
@@ -294,9 +315,11 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
     )
 
     if not collection and should_exist:
+        logger.warning(f"Collection {collection_name} not found for user {user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
 
     if collection and not should_exist:
+        logger.warning(f"Collection {collection_name} already exists for user {user_id}")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Collection already exists for this user")
 
     return collection["id"] if collection else None
@@ -309,3 +332,4 @@ async def update_modified_status_of_collection(collection_id):
         {"id": collection_id},
         {"$set": {"last_modified": datetime.now().isoformat()}}
     )
+    logger.info(f"Collection info from {collection_id} updated")

@@ -4,9 +4,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import PubSub
 import os
 
-from .own_logger import get_logger
-
-logger = get_logger()
+from .logger_manager import LoggerManager
 
 class DbClient:
     db: Database
@@ -22,8 +20,10 @@ class DbClient:
         return cls._instance
 
     def __init__(self):
+        logger_instance = LoggerManager()
+        self.logger = logger_instance.get_logger()
         if not hasattr(self, 'initialized'):
-            logger.info("Connect to Database...")
+            self.logger.info("Connect to Database...")
             # Umgebungsvariablen abrufen
             self.redis_host = os.getenv("REDIS_HOST", "localhost")
             self.mongo_uri = os.getenv("MONGO_URI", "MONGO_URI")
@@ -50,7 +50,7 @@ class DbClient:
             self.initialized = True
 
     def shutdown(self):
-        logger.info("Closing DB connections...")
+        self.logger.info("Closing DB connections...")
         self.mongo_client.close()
         self.redis_client.close()
 

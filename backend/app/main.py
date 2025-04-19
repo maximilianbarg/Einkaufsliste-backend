@@ -7,8 +7,7 @@ from .dbclient import DbClient
 from .routers import collections, websockets
 from .dependencies import router
 from .service_loader import load_services
-from .own_logger import get_logger, log_format
-#import debugpy
+from .logger_manager import LoggerManager
 import multiprocessing
 import logging
 
@@ -18,7 +17,9 @@ import asyncio
 import uvloop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-logger = get_logger()
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
+
 DEBUG = os.getenv("DEBUG", 0)
 
 def is_master_process() -> bool:
@@ -59,27 +60,11 @@ app.include_router(websockets.router)
 
 #-------------------------------------------------------------------------------------------------------------------
 
-#@app.middleware("http")
-async def log_structured_requests(request: Request, call_next):
-    logger.info({
-        "event": "request",
-        "method": request.method,
-        "url": str(request.url),
-        "headers": dict(request.headers),
-        "client": request.client.host
-    })
-    response = await call_next(request)
-    logger.info({
-        "event": "response",
-        "status_code": response.status_code
-    })
-    return response
-
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger = logging.getLogger("fastapi")
     response = await call_next(request)
-    logger.info(f"{request.method} {response.status_code} - {request.url}")
+    logger.debug(f"{request.method} {response.status_code} - {request.url}")
     return response
 
 # Root-Endpunkt

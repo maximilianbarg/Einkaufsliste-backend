@@ -1,9 +1,11 @@
 import importlib
 import os
 import asyncio
-from .own_logger import get_logger
+from .logger_manager import LoggerManager
 
-logger = get_logger()
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
+
 PLUGIN_FOLDER = os.path.join(os.path.dirname(__file__), "plugins")
 
 async def load_services():
