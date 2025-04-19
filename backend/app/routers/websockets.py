@@ -41,15 +41,15 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Beispiel-Endpunkt: Nachricht an alle Benutzer senden (Broadcast)
 @router.post("/broadcast")
-async def broadcast_message(message: str):
-    await manager.send_to_broadcast(message)
+async def broadcast_message(message: str, current_user: User = Depends(get_current_active_user)):
+    await manager.send_to_broadcast(current_user.username, message)
     return {"message": "Broadcast sent to all connected users."}
 
 
 # Beispiel-Endpunkt: Nachricht an eine Gruppe senden
 @router.post("/channel/{channel_name}")
-async def send_to_channel(channel_name: str, message: str):
-    await manager.send_to_channel(channel_name, message)
+async def send_to_channel(channel_name: str, message: str, current_user: User = Depends(get_current_active_user)):
+    await manager.send_to_channel(current_user.username, channel_name, message)
     return {"message": f"Message sent to group {channel_name}."}
 
 

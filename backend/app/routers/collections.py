@@ -225,7 +225,7 @@ async def create_item(collection_id: str, item: Dict, current_user: User = Depen
         del created_item["_id"]
 
     # Publish a WebSocket notification
-    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
+    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
 
     # Return the inserted item's ID
     return {"message": "Item created", "id": item_id}
@@ -254,7 +254,7 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
         del updated_item["_id"]
 
     # Publish a WebSocket notification
-    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
+    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
 
     return {"message": "Item updated", "id": item_id}
 
@@ -274,7 +274,7 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
     await update_modified_status_of_collection(collection_id)
 
     # Publish a WebSocket notification
-    sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
+    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
 
     return {"message": "Item deleted", "id": item_id}
 
