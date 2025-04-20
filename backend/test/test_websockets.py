@@ -4,6 +4,7 @@ import aiohttp
 import requests
 import json
 from fastapi import status
+import time
 
 url = "http://localhost:8000"
 uri = "ws://localhost:8000/sockets/connect"
@@ -55,6 +56,8 @@ async def test_websocket_connection_create_item():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
+                    
+                time.sleep(0.5)
 
             async def create_item():
                 post_url = f"{url}/collections/{collection_id}/item"
@@ -117,6 +120,8 @@ async def test_websocket_connection_edit_item():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
+                    
+                time.sleep(0.5)
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
@@ -177,6 +182,8 @@ async def test_websocket_connection_remove_item():
                 post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
+
+                time.sleep(0.5)
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"

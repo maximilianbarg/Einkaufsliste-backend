@@ -15,7 +15,7 @@ import logging
 # Setze uvloop als Event-Loop-Policy
 import asyncio
 import uvloop
-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
@@ -42,15 +42,16 @@ async def lifespan(app: FastAPI):
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
 
-instrumentator = Instrumentator(
-        should_group_status_codes=False,
-        should_ignore_untemplated=True,
-        excluded_handlers=[".*admin.*", "/metrics"],
-    )
+if(DEBUG == 1):
+    instrumentator = Instrumentator(
+            should_group_status_codes=False,
+            should_ignore_untemplated=True,
+            excluded_handlers=[".*admin.*", "/metrics"],
+        )
 
-# Prometheus metrics
-logger.info("Starting Prometheus metrics...")
-instrumentator.instrument(app).expose(app)
+    # Prometheus metrics
+    logger.info("Starting Prometheus metrics...")
+    instrumentator.instrument(app).expose(app)
 
 app.debug = True if(DEBUG == 1) else False
 

@@ -1,16 +1,17 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.database import Database
 from redis.asyncio import Redis
+from redis.asyncio.client import PubSub
 import os
-from broadcaster import Broadcast
 
 from .logger_manager import LoggerManager
 
 class DbClient:
     db: Database
     redis_client: Redis
-    synchronizer: Broadcast
+    synchronizer:  PubSub
     mongo_client: AsyncIOMotorClient
+    redis_client_pub_sub: Redis
     
     _instance = None
 
@@ -51,7 +52,15 @@ class DbClient:
             )
 
             self.db: Database = self.mongo_client[self.mongo_db]
-            self.synchronizer = Broadcast(f"redis://{self.redis_host}:6379")
+
+            self.redis_client_pub_sub = Redis(
+                host=self.redis_host,
+                port=6379,
+                decode_responses=True,
+                auto_close_connection_pool=False
+            )
+
+            self.synchronizer = self.redis_client_pub_sub.pubsub()
 
 
     def shutdown(self):
