@@ -290,7 +290,7 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
 async def get_collection_by_id(collection_id: str) -> Collection:
     collection = db[collection_id]
 
-    if not collection:
+    if collection is None:
         logger.warning(f"Collection {collection_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     
@@ -299,7 +299,7 @@ async def get_collection_by_id(collection_id: str) -> Collection:
 async def get_collection_info(collection_id) -> Dict:
     collection_info = await db.users_collections.find_one({"id": collection_id})
 
-    if not collection_info:
+    if collection_info is None:
         logger.warning(f"Collection info {collection_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     
@@ -314,7 +314,7 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
         {"collection_name": collection_name, "users": user_id}
     )
 
-    if not collection and should_exist:
+    if collection is None and should_exist:
         logger.warning(f"Collection {collection_name} not found for user {user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
 

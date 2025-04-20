@@ -15,7 +15,7 @@ import logging
 # Setze uvloop als Event-Loop-Policy
 import asyncio
 import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
@@ -29,8 +29,8 @@ def is_master_process() -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Connect to Database...")
     db_client = DbClient()
+    await db_client.synchronizer.connect()
 
     if is_master_process():
         logger.info("Starting background services...")

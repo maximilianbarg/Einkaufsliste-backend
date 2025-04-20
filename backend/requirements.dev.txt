@@ -1,8 +1,8 @@
 fastapi[standard]==0.115.6
 websockets==14.1
-pymongo==4.10.1
 motor==3.7.0
 redis==5.2.1
+broadcaster[redis]==0.3.1
 python-jose==3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.0

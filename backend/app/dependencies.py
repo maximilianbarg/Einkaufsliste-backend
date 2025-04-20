@@ -7,6 +7,8 @@ from pydantic import BaseModel
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Annotated
+
+from .logger_manager import LoggerManager
 from .routers import user
 from .dbclient import DbClient
 
@@ -30,6 +32,9 @@ router = APIRouter(
     tags=["user"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
+
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
 
 ## classes
 
@@ -60,6 +65,7 @@ async def get_user(username: str):
 # **Benutzer in `users`-Collection speichern**
 async def create_user(username: str, fullname: str, email: str, password: str, admin_key: str):
     if admin_key != ADMIN_KEY:
+        logger.warning(f"admin key {admin_key} wrong")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin key wrong")
 
     user = UserInDB(
@@ -92,6 +98,7 @@ async def delete_user_in_db(username: str):
     )
 
     if result.deleted_count == 0:
+        logger.warning(f"user {username} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 # Authentifizierung überprüfen
@@ -124,6 +131,7 @@ async def extract_token(token: str) -> UserInDB:
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -131,14 +139,18 @@ async def extract_token(token: str) -> UserInDB:
             raise credentials_exception
         token_data = TokenData(username=username)
     except JWTError:
+        logger.warning(f"Could not validate credentials")
         raise credentials_exception
+    
     user = await get_user(username=token_data.username)
     if user is None:
+        logger.warning(f"Could not validate credentials")
         raise credentials_exception
     return user
 
 async def get_current_active_user(current_user: user.User = Depends(get_current_user)) -> UserInDB:
     if current_user.disabled:
+        logger.warning(f"user {current_user.username} disabled. Tried to login")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 
@@ -168,10 +180,14 @@ async def sign_up_for_access_token(username: str = Form(...), fullname: str = Fo
     if user == None:
         user = await create_user(username, fullname, email, password, admin_key)
     else:
+        logger.warning(f"username {username} already exists")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="username already exists",
         )
+    
+    logger.info(f"user {username} created")
+
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -180,6 +196,7 @@ async def sign_up_for_access_token(username: str = Form(...), fullname: str = Fo
 async def delete_user(background_tasks: BackgroundTasks, username: str = Form(...), password: str = Form(...)):
     user = await authenticate_user(username, password)
     if not user:
+        logger.warning(f"user {username} could not be deleted")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -187,7 +204,8 @@ async def delete_user(background_tasks: BackgroundTasks, username: str = Form(..
         )
 
     background_tasks.add_task(delete_user_in_db, username)
-    
+
+    logger.info(f"user {username} deleted")
     return {"message": "user deleted"}
 
 # Authentifizierung: Token-Endpunkt
@@ -195,6 +213,7 @@ async def delete_user(background_tasks: BackgroundTasks, username: str = Form(..
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
+        logger.warning(f"wrong password for user {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

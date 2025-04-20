@@ -1,18 +1,20 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.database import Database
 from redis.asyncio import Redis
-from redis.asyncio.client import PubSub
 import os
+from broadcaster import Broadcast
 
 from .logger_manager import LoggerManager
 
 class DbClient:
     db: Database
     redis_client: Redis
-    redis_pub_sub: PubSub
+    synchronizer: Broadcast
     mongo_client: AsyncIOMotorClient
     
     _instance = None
+
+    _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -20,9 +22,14 @@ class DbClient:
         return cls._instance
 
     def __init__(self):
-        logger_instance = LoggerManager()
-        self.logger = logger_instance.get_logger()
-        if not hasattr(self, 'initialized'):
+         if self._initialized:
+            return
+         else:
+            self._initialized = True
+        
+            logger_instance = LoggerManager()
+            self.logger = logger_instance.get_logger()
+        
             self.logger.info("Connect to Database...")
             # Umgebungsvariablen abrufen
             self.redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -44,14 +51,13 @@ class DbClient:
             )
 
             self.db: Database = self.mongo_client[self.mongo_db]
+            self.synchronizer = Broadcast(f"redis://{self.redis_host}:6379")
 
-            self.redis_pub_sub = self.redis_client.pubsub()
-
-            self.initialized = True
 
     def shutdown(self):
         self.logger.info("Closing DB connections...")
         self.mongo_client.close()
         self.redis_client.close()
+        self.synchronizer.disconnect()
 
     
