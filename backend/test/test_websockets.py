@@ -13,6 +13,8 @@ username1 = "test_websocket_user_2"
 password = "test_password"
 
 
+delay = 0.3
+
 async def create_user(username: str, password: str) -> str:
     # Create user via POST request
     data = {
@@ -57,7 +59,7 @@ async def test_websocket_connection_create_item():
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
                     
-                time.sleep(0.5)
+                time.sleep(delay)
 
             async def create_item():
                 post_url = f"{url}/collections/{collection_id}/item"
@@ -121,7 +123,7 @@ async def test_websocket_connection_edit_item():
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
                     
-                time.sleep(0.5)
+                time.sleep(delay)
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
@@ -183,7 +185,7 @@ async def test_websocket_connection_remove_item():
                 async with session.post(post_url, headers=headers2) as response:
                     assert response.status == status.HTTP_200_OK
 
-                time.sleep(0.5)
+                time.sleep(delay)
 
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
