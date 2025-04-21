@@ -1,5 +1,5 @@
 import bson
-from fastapi import HTTPException, Depends, APIRouter, status, Form
+from fastapi import HTTPException, Depends, APIRouter, status, Form, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -7,6 +7,8 @@ from pydantic import BaseModel
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Annotated
+
+from .logger_manager import LoggerManager
 from .routers import user
 from .dbclient import DbClient
 
@@ -31,6 +33,9 @@ router = APIRouter(
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
 
+logger_instance = LoggerManager()
+logger = logger_instance.get_logger()
+
 ## classes
 
 # Modelle
@@ -51,15 +56,16 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 # **Benutzer aus `users`-Collection abrufen**
-def get_user(username: str):
-    user_dict = db["users"].find_one({"username": username})
+async def get_user(username: str):
+    user_dict = await db["users"].find_one({"username": username})
     if user_dict:
         return UserInDB(**user_dict)
     return None
 
 # **Benutzer in `users`-Collection speichern**
-def create_user(username: str, fullname: str, email: str, password: str, admin_key: str):
+async def create_user(username: str, fullname: str, email: str, password: str, admin_key: str):
     if admin_key != ADMIN_KEY:
+        logger.warning(f"admin key {admin_key} wrong")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin key wrong")
 
     user = UserInDB(
@@ -70,33 +76,34 @@ def create_user(username: str, fullname: str, email: str, password: str, admin_k
         disabled=False
     )
 
-    db["users"].insert_one(user.model_dump())
+    await db["users"].insert_one(user.model_dump())
     return user
 
 # **Benutzer aus `users`-Collection löschen**
-def delete_user_in_db(username: str):
-    result = db["users"].delete_one({"username": username})
+async def delete_user_in_db(username: str):
+    result = await db["users"].delete_one({"username": username})
 
     collections_to_delete = db.users_collections.find({"owner": username})
 
     # delete owned collections
-    for col in list(collections_to_delete):
-        db.drop_collection(col["id"])
+    async for col in collections_to_delete:
+        await db.drop_collection(col["id"])
 
-    db.users_collections.delete_many({"owner": username})
+    await db.users_collections.delete_many({"owner": username})
 
     # delete user from collection list
-    db.users_collections.update_many(
+    await db.users_collections.update_many(
         {"users": username},  # Alle Dokumente finden, in denen der Benutzer existiert
         {"$pull": {"users": username}}  # Benutzer aus der `users`-Liste entfernen
     )
 
     if result.deleted_count == 0:
+        logger.warning(f"user {username} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 # Authentifizierung überprüfen
-def authenticate_user(username: str, password: str):
-    user = get_user(username)
+async def authenticate_user(username: str, password: str):
+    user = await get_user(username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -124,6 +131,7 @@ async def extract_token(token: str) -> UserInDB:
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -131,14 +139,18 @@ async def extract_token(token: str) -> UserInDB:
             raise credentials_exception
         token_data = TokenData(username=username)
     except JWTError:
+        logger.warning(f"Could not validate credentials")
         raise credentials_exception
-    user = get_user(username=token_data.username)
+    
+    user = await get_user(username=token_data.username)
     if user is None:
+        logger.warning(f"Could not validate credentials")
         raise credentials_exception
     return user
 
 async def get_current_active_user(current_user: user.User = Depends(get_current_user)) -> UserInDB:
     if current_user.disabled:
+        logger.warning(f"user {current_user.username} disabled. Tried to login")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 
@@ -147,12 +159,13 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
 # Geschützter Endpunkt
 @router.get("/user/all")
 async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
-    users = list(db["users"].find())
+    users = []
 
-    for user in users:
+    async for user in db["users"].find():
         del user["_id"]
         del user["disabled"]
         del user["hashed_password"]
+        users.append(user)
 
     return users
 
@@ -163,36 +176,44 @@ async def read_users_me(current_user: user.User = Depends(get_current_active_use
 # Neuen Nutzer anlegen
 @router.post("/user/sign_up", response_model=Token)
 async def sign_up_for_access_token(username: str = Form(...), fullname: str = Form(...), email: str = Form(...), password: str = Form(...), admin_key: str = Form(...)):
-    user = get_user(username)
+    user = await get_user(username)
     if user == None:
-        user = create_user(username, fullname, email, password, admin_key)
+        user = await create_user(username, fullname, email, password, admin_key)
     else:
+        logger.warning(f"username {username} already exists")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="username already exists",
         )
+    
+    logger.info(f"user {username} created")
+
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Nutzer entfernen
 @router.post("/user/delete")
-async def delete_user(username: str = Form(...), password: str = Form(...)):
-    user = authenticate_user(username, password)
+async def delete_user(background_tasks: BackgroundTasks, username: str = Form(...), password: str = Form(...)):
+    user = await authenticate_user(username, password)
     if not user:
+        logger.warning(f"user {username} could not be deleted")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    delete_user_in_db(username)
+    background_tasks.add_task(delete_user_in_db, username)
+
+    logger.info(f"user {username} deleted")
     return {"message": "user deleted"}
 
 # Authentifizierung: Token-Endpunkt
 @router.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
+        logger.warning(f"wrong password for user {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
