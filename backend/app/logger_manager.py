@@ -5,7 +5,7 @@ import logging.handlers
 import queue
 import os
 
-DEBUG = os.getenv("DEBUG", 0)
+DEBUG = os.getenv("DEBUG", "0")
 
 class LoggerManager:
     _instance = None
@@ -52,7 +52,7 @@ class LoggerManager:
         self.logger.setLevel(logging.DEBUG)
         self.logger.addHandler(self.queue_handler)
         
-        if(DEBUG == 1):
+        if(DEBUG == "1"):
             loki_handler = logging_loki.LokiHandler(
                 url="http://loki:3100/loki/api/v1/push", 
                 tags={"application": "einkaufsliste_backend"},
@@ -61,7 +61,8 @@ class LoggerManager:
             )
             self.logger.addHandler(loki_handler)
 
-    def get_logger(self):
+    def get_logger(self, name: str = "Einkaufsliste Backend"):
+        self.logger.name = name
         return self.logger
 
     def stop_listener(self):

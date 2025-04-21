@@ -20,7 +20,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
 
-DEBUG = os.getenv("DEBUG", 0)
+DEBUG = os.getenv("DEBUG", "0")
 
 def is_master_process() -> bool:
     """Funktion, um zu prüfen, ob wir im Master-Prozess sind"""
@@ -30,8 +30,7 @@ def is_master_process() -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_client = DbClient()
-    await db_client.synchronizer.connect()
-
+    
     if is_master_process():
         logger.info("Starting background services...")
         await load_services()
@@ -42,18 +41,18 @@ async def lifespan(app: FastAPI):
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
 
-if(DEBUG == 1):
-    instrumentator = Instrumentator(
-            should_group_status_codes=False,
-            should_ignore_untemplated=True,
-            excluded_handlers=[".*admin.*", "/metrics"],
-        )
+instrumentator = Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        excluded_handlers=[".*admin.*", "/metrics"],
+    )
 
+if DEBUG == "1":
     # Prometheus metrics
     logger.info("Starting Prometheus metrics...")
     instrumentator.instrument(app).expose(app)
 
-app.debug = True if(DEBUG == 1) else False
+app.debug = True if(DEBUG == "1") else False
 
 app.include_router(router)
 app.include_router(collections.router)
