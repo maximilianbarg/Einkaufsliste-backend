@@ -38,7 +38,7 @@ sockets = ConnectionManager()
 
 # Logging
 logger_instance = LoggerManager()
-logger = logger_instance.get_logger()
+logger = logger_instance.get_logger("Collections")
 
 
 ## user collections -------------------------------------------------------------------------

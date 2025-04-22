@@ -1,6 +1,11 @@
 import asyncio
 from asyncio import Task
 from typing import Any
+from .logger_manager import LoggerManager
+
+loggermanager = LoggerManager()
+
+logger = loggermanager.get_logger("Task Manager")
 
 class TaskManager:
 
@@ -11,4 +16,4 @@ class TaskManager:
         try:
             return await task
         except Exception as e:
-            self.logger.error(f"Task failed: {e}")
+            logger.error(f"Task failed: {e}")
