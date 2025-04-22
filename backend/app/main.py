@@ -3,40 +3,48 @@ from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
 
-from .dbclient import DbClient
+from app.dbclient import DbClient
 from .routers import collections, websockets
 from .dependencies import router
 from .service_loader import load_services
 from .logger_manager import LoggerManager
-import multiprocessing
+from .connection_manager import ConnectionManager
+
+from multiprocessing import parent_process
 import logging
 
 
 # Setze uvloop als Event-Loop-Policy
 import asyncio
 import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
+
+db_client = DbClient()
+connectionManager = ConnectionManager()
 
 DEBUG = os.getenv("DEBUG", "0")
 
 def is_master_process() -> bool:
     """Funktion, um zu prüfen, ob wir im Master-Prozess sind"""
-    return os.getpid() == multiprocessing.get_start_method()
-
+    return parent_process() is None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_client = DbClient()
+    master = is_master_process()
     
-    if is_master_process():
+    if not master:
+        await db_client.init()
+        await connectionManager.init(db_client)
+    
+    if master:
         logger.info("Starting background services...")
         await load_services()
 
     yield
-    db_client.shutdown()
+    await db_client.shutdown()
 
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)

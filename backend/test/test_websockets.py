@@ -13,7 +13,7 @@ username1 = "test_websocket_user_2"
 password = "test_password"
 
 
-delay = 0.3
+delay = 0.1
 
 async def create_user(username: str, password: str) -> str:
     # Create user via POST request
@@ -49,25 +49,24 @@ async def test_websocket_connection_create_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("id")
+    collection_id = response_data.get("id", "")
+
+    assert collection_id != ""
+
+    post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
+    response = requests.post(post_url, headers=headers2)
+    assert response.status_code == status.HTTP_200_OK       
+    time.sleep(delay)
 
     # when
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect(uri, headers=headers2) as websocket:
-            async def subscribe_user():
-                post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
-                async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == status.HTTP_200_OK
-                    
-                time.sleep(delay)
-
+        async with session.ws_connect(uri, headers=headers2) as websocket:                    
             async def create_item():
                 post_url = f"{url}/collections/{collection_id}/item"
                 async with session.post(post_url, headers=headers1, json=item_data) as response:
                     assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
-            await asyncio.create_task(subscribe_user())
             await asyncio.create_task(create_item())
 
             async for msg in websocket:
@@ -107,7 +106,9 @@ async def test_websocket_connection_edit_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("id")
+    collection_id = response_data.get("id", "")
+
+    assert collection_id != ""
 
     response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers2, json=item_data)
     response_data = response.json()
@@ -115,23 +116,20 @@ async def test_websocket_connection_edit_item():
 
     item_data = {"name": "test_item_edited", "description": "This is a test item"}
 
+    post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
+    response = requests.post(post_url, headers=headers2)
+    assert response.status_code == status.HTTP_200_OK       
+    time.sleep(delay)
+
     # when
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(uri, headers=headers2) as websocket:
-            async def subscribe_user():
-                post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
-                async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == status.HTTP_200_OK
-                    
-                time.sleep(delay)
-
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.put(post_url, headers=headers1, json=item_data) as response:
                     assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
-            await asyncio.create_task(subscribe_user())
             await asyncio.create_task(edit_item())
 
             async for msg in websocket:
@@ -171,29 +169,28 @@ async def test_websocket_connection_remove_item():
     item_data = {"name": "test_item", "description": "This is a test item"}
 
     response_data = response.json()
-    collection_id = response_data.get("id")
+    collection_id = response_data.get("id", "")
+
+    assert collection_id != ""
 
     response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers2, json=item_data)
     response_data = response.json()
     item_id = response_data.get("id")
 
+    post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
+    response = requests.post(post_url, headers=headers2)
+    assert response.status_code == status.HTTP_200_OK       
+    time.sleep(delay)
+
     # when
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect(uri, headers=headers2) as websocket:
-            async def subscribe_user():
-                post_url = f"{url}/sockets/channel/{collection_id}/subscribe"
-                async with session.post(post_url, headers=headers2) as response:
-                    assert response.status == status.HTTP_200_OK
-
-                time.sleep(delay)
-
             async def edit_item():
                 post_url = f"{url}/collections/{collection_id}/item/{item_id}"
                 async with session.delete(post_url, headers=headers1) as response:
                     assert response.status == status.HTTP_200_OK
 
             # Starte Task parallel
-            await asyncio.create_task(subscribe_user())
             await asyncio.create_task(edit_item())
 
             async for msg in websocket:

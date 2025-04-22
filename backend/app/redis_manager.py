@@ -5,10 +5,12 @@ from .logger_manager import LoggerManager
 
 
 class RedisStreamManager:
+    groups: Dict[str, str] = {}
+
     def __init__(self, redis: Redis):
         self.redis = redis
         loggermanager = LoggerManager()
-        self.logger = loggermanager.get_logger("RedisStreamManager")
+        self.logger = loggermanager.get_logger("Redis Stream Manager")
 
     async def listen_to_stream(
         self,
@@ -20,6 +22,7 @@ class RedisStreamManager:
         count: int = 10
     ):
         await self.create_group(stream_key, group)
+        self.logger.debug(f"start listening for messages in channel {stream_key}")
 
         while True:
             try:
@@ -40,14 +43,24 @@ class RedisStreamManager:
                 break
             except Exception as e:
                 self.logger.error(f"Error in stream listener {stream_key}: {e}")
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.3)
 
     async def create_group(self, stream_key, group):
         try:
             await self.redis.xgroup_create(name=stream_key, groupname=group, id="$", mkstream=True)
+            self.groups[stream_key] = group
         except Exception as e:
             if "BUSYGROUP" in str(e):
                 self.logger.debug(f"Group {group} for stream {stream_key} already exists.")
+            else:
+                raise
+    
+    async def delete_group(self, stream_key, group):
+        try:
+            await self.redis.xgroup_destroy(name=stream_key, groupname=group)
+        except Exception as e:
+            if "BUSYGROUP" in str(e):
+                self.logger.debug(f"Group {group} for stream {stream_key} already destroyed.")
             else:
                 raise
 
@@ -60,6 +73,7 @@ class RedisStreamManager:
     maxlen: int = None
 ) -> str:
         await self.create_group(stream_key, group_name)
+        self.logger.debug(f"add redis message to channel {stream_key}")
 
         send_data = {"channel": stream_key, "sender": user_id, "data": data}
 

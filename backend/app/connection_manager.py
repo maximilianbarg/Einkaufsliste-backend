@@ -7,26 +7,29 @@ from redis.asyncio.client import PubSub
 from .logger_manager import LoggerManager
 from .dbclient import DbClient
 from .redis_manager import RedisStreamManager
+from .task_manager import TaskManager
 
 
 class ConnectionManager:
     _instance = None
-    divider = "|"
-    db_client = DbClient()
-    redis_stream_manager = RedisStreamManager(db_client.redis_client)
-    subscriber_tasks: Dict[str, asyncio.Task] = {}
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(ConnectionManager, cls).__new__(cls, *args, **kwargs)
         return cls._instance
     
-    def __init__(self):
+    async def init(self, db_client: DbClient):
         logger_instance = LoggerManager()
         self.logger = logger_instance.get_logger()
         self.active_connections: Dict[str, WebSocket] = {}
         self.channels: Dict[str, List[str]] = {}
-        self.subscription_ready: Dict[str, asyncio.Event] = {}  # 🔧 NEU
+        self.subscription_ready: Dict[str, asyncio.Event] = {}
+        self.subscriber_tasks: Dict[str, asyncio.Task] = {}
+        self.taskManager = TaskManager()
+
+        self.db_client = db_client
+        self.redis_stream_manager = RedisStreamManager(db_client.redis_client)
+        
 
     # ------------------- connection -------------------
 
@@ -45,10 +48,10 @@ class ConnectionManager:
     async def send_to_user(self, user_id: str, message: str):
         websocket = self.active_connections.get(user_id)
         if websocket:
-            self.logger.debug(f"message sent to user {user_id}")
+            self.logger.debug(f"websocket message sent to user {user_id}")
             await websocket.send_text(message)
         else:
-            self.logger.warning(f"user {user_id} is not connected. trying different socket manager.")
+            self.logger.warning(f"user {user_id} is not connected. wrong socket manager.")
 
     async def send_to_broadcast(self, user_id: str, message: str):
         for connection in self.active_connections.values():
@@ -59,9 +62,39 @@ class ConnectionManager:
             except WebSocketDisconnect:
                 self.disconnect(connection)
 
-    async def send_to_channel(self, user_id: str, channel_name: str, message: str, send_to_broadcast: bool = True):
+    async def send_to_channel(self, user_id: str, channel_name: str, message: str, msg_id: str = "", send_to_broadcast: bool = True):
+        handler = "[Redis Stream]"
         if send_to_broadcast:
-            self.logger.debug(f"send event to redis {channel_name}")
+            handler = "[Direkt Call]"
+
+        self.logger.info(f"{handler}: send message to users")
+        message_sent = True
+        channel_user_ids = self.channels.get(channel_name, [])
+
+        self.logger.debug(f"{handler}: channel_user_ids: {channel_user_ids}")
+        if len(channel_user_ids) == 0:
+            self.logger.debug(f"{handler}: channel not in this worker")
+            message_sent = False
+
+        self.logger.debug(f"{handler}: BEFORE SEND TO USER | message_sent: {message_sent}")
+
+        for channel_user_id in channel_user_ids:
+            active_connection = self.active_connections.get(channel_user_id)
+            self.logger.debug(f"{handler}: active_connection: {active_connection}")
+
+            if  active_connection is None:
+                self.logger.info(f"{handler}: user {channel_user_id} not in active connections")
+                message_sent = False
+                continue
+            
+            if channel_user_id != user_id:
+                self.logger.info(f"{handler}: user {channel_user_id} in active connections")
+                await self.send_to_user(channel_user_id, message)
+
+        self.logger.debug(f"{handler}: AFTER SEND TO USER | message_sent: {message_sent}")
+        
+        if send_to_broadcast and not message_sent:
+            self.logger.debug(f"{handler}: send message to different worker {channel_name}")
             await self.redis_stream_manager.add_message(
                 stream_key=channel_name,
                 group_name="websocket_group",
@@ -69,12 +102,11 @@ class ConnectionManager:
                 data=message
             )
         
-        channel_user_ids = self.channels.get(channel_name, [])
-
-        for channel_user_id in channel_user_ids:
-            if channel_user_id != user_id and self.active_connections[channel_user_id] != None:
-                await self.send_to_user(channel_user_id, message)
-
+        if not send_to_broadcast and message_sent:
+            self.logger.info(f"{handler}: message in redis acknowledged")
+            # ACK und DEL message
+            await self.redis_stream_manager.ack_message(channel_name, "websocket_group", msg_id)
+            await self.redis_stream_manager.delete_message(channel_name, msg_id)
 
     # ------------------- channel management -------------------
 
@@ -91,8 +123,10 @@ class ConnectionManager:
         if channel_name in self.channels and user_id in self.channels[channel_name]:
             self.logger.debug(f"websocket unsubscribe user {user_id} from channel {channel_name}")
             self.channels[channel_name].remove(user_id)
-            self.logger.debug(f"websocket redis unsubscribe from {channel_name}")
-            asyncio.create_task(self.unsubscribe(channel_name))
+
+            if self.channels[channel_name].count == 0:
+                self.logger.debug(f"websocket redis unsubscribe from {channel_name}")
+                self.taskManager.create_task(self.unsubscribe(channel_name))
 
     def remove_all_users_from_channel(self, channel_name: str):
         if channel_name in self.channels:
@@ -110,30 +144,34 @@ class ConnectionManager:
         key = f"{channel_name}|{user_id}"
         self.subscription_ready[key] = asyncio.Event()
 
-        task = asyncio.create_task(
+        self.logger.debug("websocket create listener called")
+
+        task = self.taskManager.create_task(
                 self.redis_stream_manager.listen_to_stream(
                     stream_key=channel_name,
                     group="websocket_group",
                     consumer=f"consumer_{user_id}",
-                    on_message=self.handle_stream_message
+                    on_message=self.handle_stream_message,
                 )
             )
+        
         self.subscriber_tasks[channel_name] = task
 
-        await self.wait_for_subscription_ready(channel_name)
+        #await self.wait_for_subscription_ready(channel_name)
     
     async def handle_stream_message(self, msg_id: str, msg_data: Dict):
-        channel = msg_data.get("channel")
-        sender = msg_data.get("sender")
-        data = msg_data.get("data")
+        try:
+            channel = msg_data.get("channel")
+            sender = msg_data.get("sender")
+            data = msg_data.get("data")
 
-        if channel and sender and data:
-            self.logger.debug(f"received stream message from user {sender} for channel {channel}")
-            await self.send_to_channel(sender, channel, data, send_to_broadcast=False)
-
-            # ACK und DEL message
-            await self.redis_stream_manager.ack_message(channel, "websocket_group", msg_id)
-            await self.redis_stream_manager.delete_message(channel, msg_id)
+            if channel and sender and data:
+                self.logger.debug(f"received stream message from user {sender} for channel {channel}")
+                await self.send_to_channel(sender, channel, data, msg_id, send_to_broadcast=False)
+        
+        except Exception as e:
+                self.logger.error(f"Error in handle_stream_message: {e}")
+                await asyncio.sleep(0.3)
 
 
     async def wait_for_subscription_ready(self, channel_name: str):
@@ -153,3 +191,5 @@ class ConnectionManager:
             except asyncio.CancelledError:
                 self.logger.debug(f"subscription task {channel_name} cancelled")
             del self.subscriber_tasks[channel_name]
+
+            await self.redis_stream_manager.delete_group(channel_name, "websocket_group")
