@@ -3,9 +3,8 @@ from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
 
-from app.dbclient import DbClient
-from .routers import collections, websockets
-from .dependencies import router
+from .database_manager import DatabaseManager
+from .routers import collections_collection_methods, collections_item_methods,  websockets, authentication
 from .service_loader import load_services
 from .logger_manager import LoggerManager
 from .connection_manager import ConnectionManager
@@ -22,7 +21,7 @@ import uvloop
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
 
-db_client = DbClient()
+database_manager = DatabaseManager()
 connectionManager = ConnectionManager()
 
 DEBUG = os.getenv("DEBUG", "0")
@@ -36,15 +35,15 @@ async def lifespan(app: FastAPI):
     master = is_master_process()
     
     if not master:
-        await db_client.init()
-        await connectionManager.init(db_client)
+        await database_manager.init()
+        await connectionManager.init(database_manager)
     
     if master:
         logger.info("Starting background services...")
         await load_services()
 
     yield
-    await db_client.shutdown()
+    await database_manager.shutdown()
 
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)
@@ -62,8 +61,9 @@ if DEBUG == "1":
 
 app.debug = True if(DEBUG == "1") else False
 
-app.include_router(router)
-app.include_router(collections.router)
+app.include_router(authentication.router)
+app.include_router(collections_collection_methods.router)
+app.include_router(collections_item_methods.router)
 app.include_router(websockets.router)
 
 #-------------------------------------------------------------------------------------------------------------------

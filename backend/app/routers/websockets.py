@@ -1,5 +1,6 @@
 from fastapi import WebSocket, WebSocketDisconnect, Depends, APIRouter, status
-from ..dependencies import user, extract_token, get_current_active_user
+from ..authentication.models import User 
+from ..authentication.auth_methods import extract_token, get_current_active_user
 from ..connection_manager import ConnectionManager
 
 router = APIRouter(
@@ -7,8 +8,6 @@ router = APIRouter(
     tags=["sockets"],
     responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
 )
-
-User = user.User
 
 # Manager-Instanz erstellen
 manager = ConnectionManager()
