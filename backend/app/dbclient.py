@@ -23,7 +23,8 @@ class DbClient:
             return
          else:
             self._initialized = True
-        
+
+    async def init(self):        
             logger_instance = LoggerManager()
             self.logger = logger_instance.get_logger()
         
@@ -37,22 +38,20 @@ class DbClient:
                 host=self.redis_host,
                 port=6379,
                 decode_responses=True,
-                max_connections=6,
+                max_connections=4,
             )
 
             self.mongo_client = AsyncIOMotorClient(
                 self.mongo_uri,
-                maxPoolSize=6,
-                minPoolSize=2,
+                maxPoolSize=4,
+                minPoolSize=1,
                 serverSelectionTimeoutMS=5000,
             )
 
             self.db: Database = self.mongo_client[self.mongo_db]
 
-    def shutdown(self):
+    async def shutdown(self):
         self.logger.info("Closing DB connections...")
         self.mongo_client.close()
-        self.redis_client.close()
-        self.synchronizer.disconnect()
-
+        await self.redis_client.close()
     

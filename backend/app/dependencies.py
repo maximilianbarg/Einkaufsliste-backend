@@ -10,7 +10,8 @@ from typing import Optional, Annotated
 
 from .logger_manager import LoggerManager
 from .routers import user
-from .dbclient import DbClient
+from app.dbclient import DbClient
+from pymongo.database import Database
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
@@ -19,8 +20,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # get db and redis
 db_client = DbClient()
-db = db_client.db
-redis_client = db_client.redis_client
+
+def get_db():
+    return db_client.db
+
+def get_redis():
+    return db_client.redis_client
 
 # OAuth2 Setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -57,7 +62,7 @@ def verify_password(plain_password, hashed_password):
 
 # **Benutzer aus `users`-Collection abrufen**
 async def get_user(username: str):
-    user_dict = await db["users"].find_one({"username": username})
+    user_dict = await get_db()["users"].find_one({"username": username})
     if user_dict:
         return UserInDB(**user_dict)
     return None
@@ -76,11 +81,12 @@ async def create_user(username: str, fullname: str, email: str, password: str, a
         disabled=False
     )
 
-    await db["users"].insert_one(user.model_dump())
+    await get_db()["users"].insert_one(user.model_dump())
     return user
 
 # **Benutzer aus `users`-Collection löschen**
 async def delete_user_in_db(username: str):
+    db = get_db()
     result = await db["users"].delete_one({"username": username})
 
     collections_to_delete = db.users_collections.find({"owner": username})
@@ -158,7 +164,7 @@ async def get_current_active_user(current_user: user.User = Depends(get_current_
 
 # Geschützter Endpunkt
 @router.get("/user/all")
-async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
+async def read_users_me(current_user: user.User = Depends(get_current_active_user), db: Database = Depends(get_db)):
     users = []
 
     async for user in db["users"].find():

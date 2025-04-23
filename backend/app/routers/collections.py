@@ -6,11 +6,12 @@ from pymongo.database import Database
 from pymongo.collection import Collection, InsertOneResult
 from typing import Dict, Optional
 from datetime import datetime, timezone
+from redis import Redis
 
 from ..logger_manager import LoggerManager
 from ..connection_manager import ConnectionManager
 from ..dependencies import user, get_current_active_user
-from ..dbclient import DbClient
+from app.dbclient import DbClient
 from ..collection_filter import parse_filter_string
 
 router = APIRouter(
@@ -26,21 +27,24 @@ User = user.User
 
 # get db and redis
 db_client = DbClient()
-db: Database = db_client.db
-redis_client = db_client.redis_client
+def get_db() -> Database:
+    return db_client.db
+
+def get_redis() -> Redis:
+    return db_client.redis_client
 
 # Manager-Instanz erstellen
 sockets = ConnectionManager()
 
 # Logging
 logger_instance = LoggerManager()
-logger = logger_instance.get_logger()
+logger = logger_instance.get_logger("Collections")
 
 
 ## user collections -------------------------------------------------------------------------
 
 @router.get("/list")
-async def get_collections(current_user: User = Depends(get_current_active_user)):
+async def get_collections(current_user: User = Depends(get_current_active_user), db: Database = Depends(get_db)):
     # get collection
     collections = db.users_collections.find({"users": current_user.username})
 
@@ -60,7 +64,7 @@ async def get_collections(current_user: User = Depends(get_current_active_user))
 
 # MongoDB: Tabelle dynamisch erstellen
 @router.post("/create/{collection_name}/{purpose}")
-async def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user)):
+async def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user), db: Database = Depends(get_db)):
     # get user id
     user_id = current_user.username
     #create collection id
@@ -87,11 +91,17 @@ async def create_table(collection_name: str, purpose: str, current_user: User = 
         upsert=True  # Erstellt den Eintrag, falls er noch nicht existiert
     )
 
+    logger.info(f"collection {collection_id} created")
     return {"message": f"Collection '{collection_name}' created successfully", "id": str(collection_id)}
 
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
-async def delete_table(collection_id: str, current_user: User = Depends(get_current_active_user)):
+async def delete_table(
+    collection_id: str, 
+    current_user: User = Depends(get_current_active_user), 
+    db: Database = Depends(get_db), 
+    redis_client: Redis = Depends(get_redis)
+    ):
 
     # delete from users list
     await db.users_collections.find_one_and_delete(
@@ -105,6 +115,7 @@ async def delete_table(collection_id: str, current_user: User = Depends(get_curr
     redis_key = f"collection_cache:{collection_id}_no_filter"
     await redis_client.delete(redis_key)
 
+    logger.info(f"collection {collection_id} deleted")
     return {"message": f"Collection deleted successfully",  "id": collection_id}
 
 @router.get("/{collection_id}/info")
@@ -113,11 +124,17 @@ async def get_items(collection_id: str, current_user: User = Depends(get_current
 
     del collection_info["_id"]
 
+    logger.info(f"collection info {collection_id} retreaved")
     return {"source": "db", "data": collection_info}
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
-async def share_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+async def share_collection(
+    collection_id: str, 
+    user_id: str, 
+    current_user: User = Depends(get_current_active_user), 
+    db: Database = Depends(get_db)
+    ):
 
     # add user to list
     result = await db.users_collections.update_one(
@@ -133,7 +150,13 @@ async def share_collection(collection_id: str, user_id: str, current_user: User 
 
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
-async def unshare_collection(collection_id: str, user_id: str, current_user: User = Depends(get_current_active_user)):
+async def unshare_collection(
+    collection_id: str, 
+    user_id: str, 
+    current_user: User = Depends(get_current_active_user), 
+    db: Database = Depends(get_db), 
+    redis_client: Redis = Depends(get_redis)
+    ):
 
     # add user to list
     result = await db.users_collections.update_one(
@@ -169,7 +192,8 @@ async def get_items(
         None,
         description="Limit-String wie '50'"
     ),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user), 
+    redis_client: Redis = Depends(get_redis)
     ):
     # 1. In Redis nachsehen
     redis_key = f"collection_cache:{collection_id}:{filter or ''}:{sort or ''}:{skip or ''}:{limit or ''}"
@@ -207,6 +231,7 @@ async def get_items(
     # 3. Daten in Redis cachen
     await redis_client.set(redis_key, json.dumps(data_json), ex=cache_time)
 
+    logger.info(f"collection {collection_id} retreaved")
     return {"source": "db"} | data_json
 
 # MongoDB: Einzelnes Item erstellen
@@ -231,6 +256,8 @@ async def create_item(collection_id: str, item: Dict, current_user: User = Depen
         created_item["id"] = str(created_item["_id"])  # ObjectId in String umwandeln
         del created_item["_id"]
 
+    logger.info(f"item in collection {collection_id} created")
+    
     # Publish a WebSocket notification
     await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
 
@@ -258,6 +285,8 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
         updated_item["id"] = str(updated_item["_id"])  # ObjectId in String umwandeln
         del updated_item["_id"]
 
+    logger.info(f"item in collection {collection_id} updated")
+
     # Publish a WebSocket notification
     await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
 
@@ -279,6 +308,8 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
     # update modified date
     await update_modified_status_of_collection(collection_id)
 
+    logger.info(f"item in collection {collection_id} deleted")
+
     # Publish a WebSocket notification
     await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
 
@@ -288,7 +319,7 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
 ## helper methods -------------------------------------------------------------------------
 
 async def get_collection_by_id(collection_id: str) -> Collection:
-    collection = db[collection_id]
+    collection = get_db()[collection_id]
 
     if collection is None:
         logger.warning(f"Collection {collection_id} not found")
@@ -297,7 +328,7 @@ async def get_collection_by_id(collection_id: str) -> Collection:
     return collection
 
 async def get_collection_info(collection_id) -> Dict:
-    collection_info = await db.users_collections.find_one({"id": collection_id})
+    collection_info = await get_db().users_collections.find_one({"id": collection_id})
 
     if collection_info is None:
         logger.warning(f"Collection info {collection_id} not found")
@@ -307,10 +338,10 @@ async def get_collection_info(collection_id) -> Dict:
 
 async def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
     collection_id = await get_collection_id(collection_name, user_id, False)
-    return db[collection_id] if collection_id else None
+    return get_db()[collection_id] if collection_id else None
 
 async def get_collection_id(collection_name, user_id, should_exist: bool = True):
-    collection = await db.users_collections.find_one(
+    collection = await get_db().users_collections.find_one(
         {"collection_name": collection_name, "users": user_id}
     )
 
@@ -326,9 +357,9 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
 
 async def update_modified_status_of_collection(collection_id):
     redis_key = f"collection_cache:{collection_id}"
-    await redis_client.delete(redis_key)
+    await get_redis().delete(redis_key)
 
-    await db.users_collections.update_one(
+    await get_db().users_collections.update_one(
         {"id": collection_id},
         {"$set": {"last_modified": datetime.now().isoformat()}}
     )
