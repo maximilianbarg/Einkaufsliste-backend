@@ -44,7 +44,7 @@ class DbClient:
             self.mongo_client = AsyncIOMotorClient(
                 self.mongo_uri,
                 maxPoolSize=4,
-                minPoolSize=2,
+                minPoolSize=1,
                 serverSelectionTimeoutMS=5000,
             )
 

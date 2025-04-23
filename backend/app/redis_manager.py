@@ -47,7 +47,9 @@ class RedisStreamManager:
 
     async def create_group(self, stream_key, group):
         try:
-            await self.redis.xgroup_create(name=stream_key, groupname=group, id="$", mkstream=True)
+            exists = await self.redis.exists(stream_key)
+            if not exists:
+                await self.redis.xgroup_create(name=stream_key, groupname=group, id="$", mkstream=True)
             self.groups[stream_key] = group
         except Exception as e:
             if "BUSYGROUP" in str(e):
@@ -75,7 +77,7 @@ class RedisStreamManager:
         await self.create_group(stream_key, group_name)
         self.logger.debug(f"add redis message to channel {stream_key}")
 
-        send_data = {"channel": stream_key, "sender": user_id, "data": data}
+        send_data = {"channel": group_name, "sender": user_id, "data": data}
 
         # Nachricht zum Stream hinzufügen
         if maxlen:
@@ -97,17 +99,23 @@ class RedisStreamManager:
 
     # ------------------- channel -------------------
 
-    async def get_users_in_channel(self, channel_name: str) -> List[str]:
+    async def get_users_in_channel(self, channel_name: str, user_id: str) -> List[str]:
         return await self.redis.smembers(f"channel:{channel_name}")
+
+    async def get_users_in_sub_channel(self, channel_name: str, user_id: str) -> List[str]:
+        return await self.redis.smembers(f"channel:{channel_name}_{user_id}")
     
     async def get_channels_of_user(self, user_id: str) -> List[str]:
         return await self.redis.smembers(f"user:{user_id}:channels")
 
     async def add_user_to_channel(self, channel_name: str, user_id: str):
+        self.logger.debug(f"add_user_to_channel {channel_name}_{user_id}")
         await self.redis.sadd(f"channel:{channel_name}", user_id)
+        await self.redis.sadd(f"channel:{channel_name}_{user_id}", user_id)
         await self.redis.sadd(f"user:{user_id}:channels", channel_name)
 
     async def remove_user_from_channel(self, channel_name: str, user_id: str):
-        await self.redis.srem(f"channel:{channel_name}", user_id)
+        self.logger.debug(f"remove_user_from_channel {channel_name}_{user_id}")
+        await self.redis.srem(f"channel:{channel_name}_{user_id}", user_id)
         await self.redis.srem(f"user:{user_id}:channels", channel_name)
 
