@@ -10,7 +10,7 @@ from typing import Optional, Annotated
 
 from .logger_manager import LoggerManager
 from .routers import user
-from app.dbclient import DbClient
+from .database_manager import get_db
 from pymongo.database import Database
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
@@ -18,14 +18,6 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# get db and redis
-db_client = DbClient()
-
-def get_db():
-    return db_client.db
-
-def get_redis():
-    return db_client.redis_client
 
 # OAuth2 Setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

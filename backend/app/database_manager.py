@@ -5,7 +5,7 @@ import os
 
 from .logger_manager import LoggerManager
 
-class DbClient:
+class DatabaseManager:
     db: Database
     redis_client: Redis
     mongo_client: AsyncIOMotorClient
@@ -54,4 +54,11 @@ class DbClient:
         self.logger.info("Closing DB connections...")
         self.mongo_client.close()
         await self.redis_client.close()
-    
+
+databaseManager = DatabaseManager()
+
+def get_db():
+    return databaseManager.db
+
+def get_redis():
+    return databaseManager.redis_client

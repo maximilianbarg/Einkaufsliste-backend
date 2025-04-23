@@ -3,9 +3,9 @@ from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
 
-from app.dbclient import DbClient
+from .database_manager import DatabaseManager
 from .routers import collections, websockets
-from .dependencies import router
+from .authentication import router
 from .service_loader import load_services
 from .logger_manager import LoggerManager
 from .connection_manager import ConnectionManager
@@ -22,7 +22,7 @@ import uvloop
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
 
-db_client = DbClient()
+database_manager = DatabaseManager()
 connectionManager = ConnectionManager()
 
 DEBUG = os.getenv("DEBUG", "0")
@@ -36,15 +36,15 @@ async def lifespan(app: FastAPI):
     master = is_master_process()
     
     if not master:
-        await db_client.init()
-        await connectionManager.init(db_client)
+        await database_manager.init()
+        await connectionManager.init(database_manager)
     
     if master:
         logger.info("Starting background services...")
         await load_services()
 
     yield
-    await db_client.shutdown()
+    await database_manager.shutdown()
 
 # FastAPI-Anwendung erstellen
 app = FastAPI(lifespan=lifespan)

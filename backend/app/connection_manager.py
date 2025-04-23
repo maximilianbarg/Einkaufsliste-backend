@@ -5,8 +5,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from redis.asyncio.client import PubSub
 
 from .logger_manager import LoggerManager
-from .dbclient import DbClient
-from .redis_manager import RedisStreamManager
+from .database_manager import DatabaseManager
+from .redis_stream_manager import RedisStreamManager
 from .task_manager import TaskManager
 
 
@@ -18,7 +18,7 @@ class ConnectionManager:
             cls._instance = super(ConnectionManager, cls).__new__(cls, *args, **kwargs)
         return cls._instance
     
-    async def init(self, db_client: DbClient):
+    async def init(self, database_manager: DatabaseManager):
         logger_instance = LoggerManager()
         self.logger = logger_instance.get_logger("Connection Manager")
         self.active_connections: Dict[str, WebSocket] = {}
@@ -27,8 +27,8 @@ class ConnectionManager:
         self.subscriber_tasks: Dict[str, asyncio.Task] = {}
         self.taskManager = TaskManager()
 
-        self.db_client = db_client
-        self.redis_stream_manager = RedisStreamManager(db_client.redis_client)
+        self.database_manager = database_manager
+        self.redis_stream_manager = RedisStreamManager(database_manager.redis_client)
         
 
     # ------------------- connection -------------------
