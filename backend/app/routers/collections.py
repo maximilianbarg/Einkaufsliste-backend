@@ -10,7 +10,8 @@ from redis import Redis
 
 from ..logger_manager import LoggerManager
 from ..connection_manager import ConnectionManager
-from ..authentication import user, get_current_active_user
+from ..authentication.models import User
+from ..authentication.auth_methods import get_current_active_user
 from ..database_manager import get_db, get_redis
 from ..collection_filter import parse_filter_string
 
@@ -22,8 +23,6 @@ router = APIRouter(
 )
 
 cache_time = 300
-
-User = user.User
 
 # Manager-Instanz erstellen
 sockets = ConnectionManager()

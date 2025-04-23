@@ -4,8 +4,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from contextlib import asynccontextmanager
 
 from .database_manager import DatabaseManager
-from .routers import collections, websockets
-from .authentication import router
+from .routers import collections, websockets, authentication
 from .service_loader import load_services
 from .logger_manager import LoggerManager
 from .connection_manager import ConnectionManager
@@ -62,7 +61,7 @@ if DEBUG == "1":
 
 app.debug = True if(DEBUG == "1") else False
 
-app.include_router(router)
+app.include_router(authentication.router)
 app.include_router(collections.router)
 app.include_router(websockets.router)
 

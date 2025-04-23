@@ -1,17 +1,14 @@
-import bson
-from fastapi import HTTPException, Depends, APIRouter, status, Form, BackgroundTasks
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import HTTPException, Depends, APIRouter, status
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Annotated
 
-from .logger_manager import LoggerManager
-from .routers import user
-from .database_manager import get_db
-from pymongo.database import Database
+from ..logger_manager import LoggerManager
+from .models import User, TokenData, UserInDB
+from ..database_manager import get_db
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
@@ -25,28 +22,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Passwort-Kontext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-router = APIRouter(
-    tags=["user"],
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
-)
-
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()
-
-## classes
-
-# Modelle
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-class UserInDB(user.User):
-    hashed_password: str
-
-## helper methods
 
 # Passwort-Hash überprüfen
 def verify_password(plain_password, hashed_password):
@@ -146,76 +123,8 @@ async def extract_token(token: str) -> UserInDB:
         raise credentials_exception
     return user
 
-async def get_current_active_user(current_user: user.User = Depends(get_current_user)) -> UserInDB:
+async def get_current_active_user(current_user: User = Depends(get_current_user)) -> UserInDB:
     if current_user.disabled:
         logger.warning(f"user {current_user.username} disabled. Tried to login")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
-
-## endpoints
-
-# Geschützter Endpunkt
-@router.get("/user/all")
-async def read_users_me(current_user: user.User = Depends(get_current_active_user), db: Database = Depends(get_db)):
-    users = []
-
-    async for user in db["users"].find():
-        del user["_id"]
-        del user["disabled"]
-        del user["hashed_password"]
-        users.append(user)
-
-    return users
-
-@router.get("/user/me", response_model=user.User)
-async def read_users_me(current_user: user.User = Depends(get_current_active_user)):
-    return current_user
-
-# Neuen Nutzer anlegen
-@router.post("/user/sign_up", response_model=Token)
-async def sign_up_for_access_token(username: str = Form(...), fullname: str = Form(...), email: str = Form(...), password: str = Form(...), admin_key: str = Form(...)):
-    user = await get_user(username)
-    if user == None:
-        user = await create_user(username, fullname, email, password, admin_key)
-    else:
-        logger.warning(f"username {username} already exists")
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="username already exists",
-        )
-    
-    logger.info(f"user {username} created")
-
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-# Nutzer entfernen
-@router.post("/user/delete")
-async def delete_user(background_tasks: BackgroundTasks, username: str = Form(...), password: str = Form(...)):
-    user = await authenticate_user(username, password)
-    if not user:
-        logger.warning(f"user {username} could not be deleted")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    background_tasks.add_task(delete_user_in_db, username)
-
-    logger.info(f"user {username} deleted")
-    return {"message": "user deleted"}
-
-# Authentifizierung: Token-Endpunkt
-@router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await authenticate_user(form_data.username, form_data.password)
-    if not user:
-        logger.warning(f"wrong password for user {form_data.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
