@@ -36,7 +36,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, user_id: str, channel_name: str):
         await websocket.accept()
 
-        connection_id = f"{channel_name}::::{user_id}"
+        connection_id = f"{channel_name}_{user_id}"
 
         self.active_connections[connection_id] = websocket
         self.logger.debug(f"[Connection Manager] connect websocket for user {user_id}")
