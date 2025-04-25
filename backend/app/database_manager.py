@@ -9,7 +9,7 @@ class DatabaseManager:
     db: Database
     redis_client: Redis
     mongo_client: AsyncIOMotorClient
-    
+
     _instance = None
     _initialized = False
 
@@ -19,15 +19,15 @@ class DatabaseManager:
         return cls._instance
 
     def __init__(self):
-         if self._initialized:
+        if self._initialized:
             return
-         else:
+        else:
             self._initialized = True
 
-    async def init(self):        
+    async def init(self):
             logger_instance = LoggerManager()
             self.logger = logger_instance.get_logger()
-        
+
             self.logger.info("Connect to Database...")
             # Umgebungsvariablen abrufen
             self.redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -57,8 +57,8 @@ class DatabaseManager:
 
 databaseManager = DatabaseManager()
 
-def get_db():
+def get_db() -> Database:
     return databaseManager.db
 
-def get_redis():
+def get_redis() -> Redis:
     return databaseManager.redis_client

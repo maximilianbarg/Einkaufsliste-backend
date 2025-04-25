@@ -32,7 +32,7 @@ async def get_collection_by_id(collection_id: str) -> Collection:
     if collection is None:
         logger.warning(f"Collection {collection_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
-    
+
     return collection
 
 async def get_collection_info(collection_id) -> Dict:
@@ -41,7 +41,7 @@ async def get_collection_info(collection_id) -> Dict:
     if collection_info is None:
         logger.warning(f"Collection info {collection_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
-    
+
     return collection_info
 
 async def get_collection_in_db(collection_name: str, user_id: str) -> Collection:
@@ -64,8 +64,12 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
     return collection["id"] if collection else None
 
 async def update_modified_status_of_collection(collection_id):
-    redis_key = f"collection_cache:{collection_id}"
-    await get_redis().delete(redis_key)
+    key_pattern = f"collection_cache:{collection_id}*"
+    redis = get_redis()
+
+    keys = await redis.keys(key_pattern)
+    if keys:
+        await redis.delete(*keys)
 
     await get_db().users_collections.update_one(
         {"id": collection_id},
