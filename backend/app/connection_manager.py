@@ -164,7 +164,7 @@ class ConnectionManager:
         message_sent = []
 
         channel_user_ids = self.channels.get(channel_name, [])
-        redis_channel_user_ids = await self.redis_stream_manager.get_users_in_sub_channel(channel_name, user_id)
+        redis_channel_user_ids = await self.redis_stream_manager.get_users_in_channel(channel_name)
         self.logger.debug(f"Websocket: channel_user_ids:       {channel_user_ids}")
         self.logger.debug(f"Websocket: redis_channel_user_ids: {redis_channel_user_ids}")
         self.logger.debug(f"Websocket: BEFORE SEND TO USER | message_sent: {message_sent}")

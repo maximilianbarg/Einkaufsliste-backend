@@ -49,7 +49,7 @@ async def get_items(
         None,
         description="Limit-String wie '50'"
     ),
-    current_user: User = Depends(get_current_active_user), 
+    current_user: User = Depends(get_current_active_user),
     redis_client: Redis = Depends(get_redis)
     ):
     # 1. In Redis nachsehen
@@ -114,7 +114,7 @@ async def create_item(collection_id: str, item: Dict, current_user: User = Depen
         del created_item["_id"]
 
     logger.info(f"item in collection {collection_id} created")
-    
+
     # Publish a WebSocket notification
     await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
 
@@ -145,7 +145,7 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     logger.info(f"item in collection {collection_id} updated")
 
     # Publish a WebSocket notification
-    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updated_item}))
+    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updates}))
 
     return {"message": "Item updated", "id": item_id}
 

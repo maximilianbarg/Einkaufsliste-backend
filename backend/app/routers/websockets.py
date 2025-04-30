@@ -31,11 +31,11 @@ async def websocket_endpoint(websocket: WebSocket, channel_name: str):
         while True:
             await websocket.receive_text() # nur dafür da, damit der websocket erhalten bleibt
     except WebSocketDisconnect:
-        channels = manager.get_subscribed_channels_of_user(user_id)
+        #channels = manager.get_subscribed_channels_of_user(user_id)
 
-        for channel in channels:
+        #for channel in channels:
             # Entfernen des Benutzers aus der Gruppe und Trennen der Verbindung
-            manager.remove_user_from_channel(user_id, channel)
+        manager.remove_user_from_channel(user_id, channel_name)
 
         manager.disconnect(websocket)
 
