@@ -25,7 +25,7 @@ class LoggerManager:
 
         self.queue_handler = logging.handlers.QueueHandler(self.log_queue)
 
-        self.log_format = '%(asctime)s - %(name)-30s - WORKER %(process)-3s - %(module)-20s - %(levelname)-7s - %(message)s'
+        self.log_format = '%(asctime)s - %(name)-30s - WORKER %(process)-3s - %(module)-35s - %(levelname)-7s - %(message)s'
         formatter = logging.Formatter(self.log_format)
 
         self.file_handler = logging.handlers.TimedRotatingFileHandler(

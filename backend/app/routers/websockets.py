@@ -1,5 +1,5 @@
 from fastapi import WebSocket, WebSocketDisconnect, Depends, APIRouter, status
-from ..authentication.models import User 
+from ..authentication.models import User
 from ..authentication.auth_methods import extract_token, get_current_active_user
 from ..connection_manager import ConnectionManager
 
@@ -13,8 +13,8 @@ router = APIRouter(
 manager = ConnectionManager()
 
 
-@router.websocket("/connect")
-async def websocket_endpoint(websocket: WebSocket):
+@router.websocket("/connect/{channel_name}")
+async def websocket_endpoint(websocket: WebSocket, channel_name: str):
 
     authorization = websocket.headers.get("Authorization")
     token = authorization.split(" ")[1]
@@ -22,18 +22,20 @@ async def websocket_endpoint(websocket: WebSocket):
 
     user_id = current_user.username
 
+    await manager.add_user_to_channel(user_id, channel_name)
+
     # Verbindungsaufbau mit Benutzer-ID
-    await manager.connect(websocket, user_id)
+    await manager.connect(websocket, user_id, channel_name)
 
     try:
         while True:
             await websocket.receive_text() # nur dafür da, damit der websocket erhalten bleibt
     except WebSocketDisconnect:
-        channels = manager.get_subscribed_channels_of_user(user_id)
+        #channels = manager.get_subscribed_channels_of_user(user_id)
 
-        for channel in channels:
+        #for channel in channels:
             # Entfernen des Benutzers aus der Gruppe und Trennen der Verbindung
-            manager.remove_user_from_channel(user_id, channel)
+        manager.remove_user_from_channel(user_id, channel_name)
 
         manager.disconnect(websocket)
 
@@ -70,5 +72,5 @@ async def remove_user_from_channel(channel_name: str, current_user: User = Depen
 # Beispiel-Endpunkt: Alle Mitglieder einer Gruppe abrufen
 @router.get("/channel/{channel_name}/members")
 async def get_channel_members(channel_name: str, current_user: User = Depends(get_current_active_user)):
-    members = manager.get_users_of_channel(channel_name)
+    members = await manager.get_users_of_channel(channel_name)
     return {"members": members}

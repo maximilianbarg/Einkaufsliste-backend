@@ -16,7 +16,7 @@ import logging
 # Setze uvloop als Event-Loop-Policy
 import asyncio
 import uvloop
-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger_instance = LoggerManager()
 logger = logger_instance.get_logger()

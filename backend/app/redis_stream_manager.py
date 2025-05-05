@@ -56,7 +56,7 @@ class RedisStreamManager:
                 self.logger.debug(f"Group {group} for stream {stream_key} already exists.")
             else:
                 raise
-    
+
     async def delete_group(self, stream_key, group):
         try:
             await self.redis.xgroup_destroy(name=stream_key, groupname=group)
@@ -99,12 +99,12 @@ class RedisStreamManager:
 
     # ------------------- channel -------------------
 
-    async def get_users_in_channel(self, channel_name: str, user_id: str) -> List[str]:
+    async def get_users_in_channel(self, channel_name: str) -> List[str]:
         return await self.redis.smembers(f"channel:{channel_name}")
 
     async def get_users_in_sub_channel(self, channel_name: str, user_id: str) -> List[str]:
         return await self.redis.smembers(f"channel:{channel_name}_{user_id}")
-    
+
     async def get_channels_of_user(self, user_id: str) -> List[str]:
         return await self.redis.smembers(f"user:{user_id}:channels")
 

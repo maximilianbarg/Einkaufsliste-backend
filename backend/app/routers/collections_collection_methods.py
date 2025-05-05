@@ -85,9 +85,9 @@ async def create_table(collection_name: str, purpose: str, current_user: User = 
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
 async def delete_table(
-    collection_id: str, 
-    current_user: User = Depends(get_current_active_user), 
-    db: Database = Depends(get_db), 
+    collection_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Database = Depends(get_db),
     redis_client: Redis = Depends(get_redis)
     ):
 
@@ -115,12 +115,32 @@ async def get_items(collection_id: str, current_user: User = Depends(get_current
     logger.info(f"collection info {collection_id} retreaved")
     return {"source": "db", "data": collection_info}
 
+@router.patch("/{collection_id}/rename/{collection_name}")
+async def rename_collection(
+    collection_id: str,
+    collection_name: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Database = Depends(get_db)
+    ):
+
+    # add user to list
+    result = await db.users_collections.update_one(
+        {"id": collection_id, "owner": current_user.username},
+        {"$set": {"collection_name": collection_name}}
+    )
+
+    if result.matched_count == 0:
+        logger.warning(f"collection {collection_id} could not be renamed")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not owner of collection")
+
+    return {"message": f"Collection renamed to '{collection_name}'",  "id": collection_id}
+
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/add/{user_id}")
 async def share_collection(
-    collection_id: str, 
-    user_id: str, 
-    current_user: User = Depends(get_current_active_user), 
+    collection_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
     db: Database = Depends(get_db)
     ):
 
@@ -139,10 +159,10 @@ async def share_collection(
 # MongoDB: Tabelle teilen
 @router.patch("/{collection_id}/users/remove/{user_id}")
 async def unshare_collection(
-    collection_id: str, 
-    user_id: str, 
-    current_user: User = Depends(get_current_active_user), 
-    db: Database = Depends(get_db), 
+    collection_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Database = Depends(get_db),
     redis_client: Redis = Depends(get_redis)
     ):
 

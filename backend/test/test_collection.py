@@ -79,6 +79,21 @@ class TestCollectionAPI:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item updated"
 
+    def test_rename_collection(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
+        collection_id = response.json()["id"]
+
+        # when
+        new_collection_name = "test_collection_new"
+        response = requests.patch(f"{url}/collections/{collection_id}/rename/{new_collection_name}", headers=headers)
+
+        # then
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["message"] != None
+
     def test_share_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
