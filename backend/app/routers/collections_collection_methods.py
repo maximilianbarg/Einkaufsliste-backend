@@ -1,5 +1,7 @@
+from typing import Optional
 from fastapi import HTTPException, Depends, APIRouter, status, Query
 import bson
+from pymongo import ASCENDING
 from pymongo.database import Database
 from datetime import datetime, timezone
 from redis import Redis
@@ -52,7 +54,15 @@ async def get_collections(current_user: User = Depends(get_current_active_user),
 
 # MongoDB: Tabelle dynamisch erstellen
 @router.post("/create/{collection_name}/{purpose}")
-async def create_table(collection_name: str, purpose: str, current_user: User = Depends(get_current_active_user), db: Database = Depends(get_db)):
+async def create_table(
+    collection_name: str, 
+    purpose: str,
+    index: Optional[str] = Query(
+        None,
+        description="index like 'price' oder 'last_modified' for faster get items"
+    ),
+    current_user: User = Depends(get_current_active_user), db: Database = Depends(get_db)
+    ):
     # get user id
     user_id = current_user.username
     #create collection id
@@ -63,6 +73,9 @@ async def create_table(collection_name: str, purpose: str, current_user: User = 
 
     # Collection erstellen
     await db.create_collection(collection_id)
+
+    if(index):
+        await db.users.create_index([(index, ASCENDING)])
 
     # Den Benutzer zur `users_collections`-Tabelle hinzufügen
     await db.users_collections.update_one(
