@@ -1,14 +1,16 @@
 import importlib
 import os
 import asyncio
-from .logger_manager import LoggerManager
+from app.logger_manager import LoggerManager
 
 logger_instance = LoggerManager()
-logger = logger_instance.get_logger()
+logger = logger_instance.get_logger("Service Loader")
 
 PLUGIN_FOLDER = os.path.join(os.path.dirname(__file__), "plugins")
 
 async def load_services():
+    logger.info("Starting background services...")
+
     tasks = []
 
     for file in os.listdir(PLUGIN_FOLDER):
@@ -24,4 +26,9 @@ async def load_services():
             except Exception as e:
                 logger.info(f"Failed to load {module_name}: {e}")
 
-    return tasks
+    # keep services alive
+    await asyncio.gather(*tasks)
+
+
+if __name__ == "__main__":
+    asyncio.run(load_services())
