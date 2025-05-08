@@ -1,12 +1,14 @@
 import asyncio
-from ..logger_manager import LoggerManager
+from app.service_base import BaseService
 
-logger_instance = LoggerManager()
-logger = logger_instance.get_logger()
+class TestService(BaseService):
+    service_name = "Test Service"
 
-service_name = "Test Service"
-
-async def run():
-    while True:
-        logger.info(f"[{service_name}] Doing some background work...")
-        await asyncio.sleep(60)
+    async def run(self):
+        print(f"✅ {self.service_name} STARTED")
+        self.logger.info(f"✅ {self.service_name} STARTED")
+        
+        while True:
+            self.get_database()
+            self.logger.info(f"[{self.service_name}] Doing some background work...")
+            await asyncio.sleep(60)
