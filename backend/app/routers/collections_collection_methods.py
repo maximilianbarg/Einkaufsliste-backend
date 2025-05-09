@@ -75,7 +75,7 @@ async def create_table(
     await db.create_collection(collection_id)
 
     if(index):
-        await db.users.create_index([(index, ASCENDING)])
+        await db[collection_id].create_index([(index, ASCENDING)])
 
     # Den Benutzer zur `users_collections`-Tabelle hinzufügen
     await db.users_collections.update_one(
