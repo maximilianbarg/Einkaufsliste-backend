@@ -8,7 +8,7 @@ class BaseService(ABC):
 
     def __init__(self):
         logger_instance = LoggerManager()
-        self.logger = logger_instance.get_logger()
+        self.logger = logger_instance.get_logger("Service Runner")
 
     def get_database(self) -> Database:
         return get_db()
