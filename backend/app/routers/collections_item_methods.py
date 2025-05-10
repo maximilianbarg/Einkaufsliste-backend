@@ -50,6 +50,10 @@ async def get_items(
         None,
         description="Limit-String wie '50'"
     ),
+    distinct: Optional[str] = Query(
+        None,
+        description="distinct Feld wie 'id' oder 'unique_item_name'"
+    ),
     current_user: User = Depends(get_current_active_user),
     redis_client: Redis = Depends(get_redis)
     ):
@@ -77,6 +81,9 @@ async def get_items(
     if skip:
         items = items.skip(int(skip))
 
+    if distinct:
+        items = items.distinct(distinct)
+
     data = await items.to_list(length=None)
 
     # ObjectId in String umwandeln
@@ -99,6 +106,14 @@ async def get_changes(
         None,
         description="Filter-String wie 'timestamp>2025-05-10T13:35:39.877988Z,timestamp<=2025-05-09T13:35:39.877988Z'"
     ),
+    sort: Optional[str] = Query(
+        None,
+        description="Sort-String wie 'price=asc' oder 'name=desc,price=asc'"
+    ),
+    distinct: Optional[str] = Query(
+        None,
+        description="distinct Feld wie 'id' oder 'unique_item_name'"
+    ),
     current_user: User = Depends(get_current_active_user),
     ):
 
@@ -110,6 +125,12 @@ async def get_changes(
     # get items
     mongo_filter = parse_filter_string(filter)
     items = collection.find(mongo_filter)
+
+    if sort:
+        items = items.sort(parse_filter_string(sort))
+
+    if distinct:
+        items = items.distinct(distinct)
 
     data = await items.to_list(length=None)
 
