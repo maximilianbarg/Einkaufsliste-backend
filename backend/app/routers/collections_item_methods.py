@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
@@ -11,7 +12,7 @@ from ..authentication.models import User
 from ..authentication.auth_methods import get_current_active_user
 from ..database_manager import get_redis
 from ..collections.collection_filter import parse_filter_string
-from ..collections.helper_methods import get_collection_by_id, get_collection_info, update_modified_status_of_collection
+from ..collections.helper_methods import get_collection_by_id, get_collection_info, update_modified_status_of_collection, add_item_event
 
 router = APIRouter(
     prefix="/collections",
@@ -91,14 +92,48 @@ async def get_items(
     logger.info(f"collection {collection_id} retreaved")
     return {"source": "db"} | data_json
 
+@router.get("/{collection_id}/changes")
+async def get_changes(
+    collection_id: str,
+    filter: Optional[str] = Query(
+        None,
+        description="Filter-String wie 'timestamp>2025-05-10T13:35:39.877988Z,timestamp<=2025-05-09T13:35:39.877988Z'"
+    ),
+    current_user: User = Depends(get_current_active_user),
+    ):
+
+    collection_events_key = f"{collection_id}_events"
+    # get collection
+    collection: Collection = await get_collection_by_id(collection_events_key)
+    collection_name = (await get_collection_info(collection_id))["collection_name"]
+
+    # get items
+    mongo_filter = parse_filter_string(filter)
+    items = collection.find(mongo_filter)
+
+    data = await items.to_list(length=None)
+
+    # ObjectId in String umwandeln
+    for item in data:
+        item["data"]["id"] = str(item["_id"])
+        del item["_id"]
+        del item["data"]["_id"]
+
+    data_json = {"name": collection_name, "data": data}
+
+    logger.info(f"collection {collection_id} changes retreaved")
+    return {"source": "db"} | data_json
+
 # MongoDB: Einzelnes Item erstellen
 @router.post("/{collection_id}/item")
 async def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
     # get collection
     collection: Collection = await get_collection_by_id(collection_id)
-
     # Insert the item into the collection
     result: InsertOneResult = await collection.insert_one(item)
+
+    # add item event
+    await add_item_event(collection_id, "created", item)
 
     # update modified date
     await update_modified_status_of_collection(collection_id)
@@ -121,7 +156,6 @@ async def create_item(collection_id: str, item: Dict, current_user: User = Depen
     # Return the inserted item's ID
     return {"message": "Item created", "id": item_id}
 
-
 # MongoDB: Einzelnes Item bearbeiten
 @router.put("/{collection_id}/item/{item_id}")
 async def update_item(collection_id: str, item_id: str, updates: Dict, current_user: User = Depends(get_current_active_user)):
@@ -133,6 +167,9 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     if updated_item is None:
         logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    # add item event
+    await add_item_event(collection_id, "edited", updated_item)
 
     # update modified date
     await update_modified_status_of_collection(collection_id)
@@ -161,6 +198,9 @@ async def delete_item(collection_id: str, item_id: str, current_user: User = Dep
     if result.deleted_count == 0:
         logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    # add item event
+    await add_item_event(collection_id, "removed", {"_id": ObjectId(item_id)})
 
     # update modified date
     await update_modified_status_of_collection(collection_id)

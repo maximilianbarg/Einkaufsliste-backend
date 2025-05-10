@@ -11,7 +11,7 @@ from ..connection_manager import ConnectionManager
 from ..authentication.models import User
 from ..authentication.auth_methods import get_current_active_user
 from ..database_manager import get_db, get_redis
-from ..collections.helper_methods import get_collection_in_db, get_collection_info
+from ..collections.helper_methods import get_collection_in_db, get_collection_info, create_collection, delete_collection
 
 
 router = APIRouter(
@@ -61,7 +61,8 @@ async def create_table(
         None,
         description="index like 'price' oder 'last_modified' for faster get items"
     ),
-    current_user: User = Depends(get_current_active_user), db: Database = Depends(get_db)
+    current_user: User = Depends(get_current_active_user), 
+    db: Database = Depends(get_db)
     ):
     # get user id
     user_id = current_user.username
@@ -72,10 +73,7 @@ async def create_table(
     await get_collection_in_db(collection_name, user_id)
 
     # Collection erstellen
-    await db.create_collection(collection_id)
-
-    if(index):
-        await db[collection_id].create_index([(index, ASCENDING)])
+    await create_collection(collection_id, index)
 
     # Den Benutzer zur `users_collections`-Tabelle hinzufügen
     await db.users_collections.update_one(
@@ -95,6 +93,7 @@ async def create_table(
     logger.info(f"collection {collection_id} created")
     return {"message": f"Collection '{collection_name}' created successfully", "id": str(collection_id)}
 
+
 # MongoDB: Ganze Tabelle löschen
 @router.delete("/{collection_id}")
 async def delete_table(
@@ -109,8 +108,8 @@ async def delete_table(
         {"id": collection_id}
     )
 
-    # delete list
-    await db.drop_collection(collection_id)
+    # delete collection
+    await delete_collection(collection_id)
 
     #remove cached item
     redis_key = f"collection_cache:{collection_id}_no_filter"
@@ -175,8 +174,7 @@ async def unshare_collection(
     collection_id: str,
     user_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Database = Depends(get_db),
-    redis_client: Redis = Depends(get_redis)
+    db: Database = Depends(get_db)
     ):
 
     # add user to list

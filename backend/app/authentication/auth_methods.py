@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, APIRouter, status
+from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -9,6 +9,7 @@ from typing import Optional, Annotated
 from ..logger_manager import LoggerManager
 from .models import User, TokenData, UserInDB
 from ..database_manager import get_db
+from ..collections.helper_methods import delete_collection
 
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
@@ -61,8 +62,8 @@ async def delete_user_in_db(username: str):
     collections_to_delete = db.users_collections.find({"owner": username})
 
     # delete owned collections
-    async for col in collections_to_delete:
-        await db.drop_collection(col["id"])
+    async for collection in collections_to_delete:
+        await delete_collection(collection["id"])
 
     await db.users_collections.delete_many({"owner": username})
 
