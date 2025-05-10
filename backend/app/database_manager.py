@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.database import Database
-from redis.asyncio import Redis
+from redis.asyncio import Redis, ConnectionPool
 import os
 
 from .logger_manager import LoggerManager
@@ -12,6 +12,8 @@ class DatabaseManager:
 
     _instance = None
     _initialized = False
+
+    max_connections = 20
 
     def __new__(cls):
         if cls._instance is None:
@@ -38,12 +40,12 @@ class DatabaseManager:
                 host=self.redis_host,
                 port=6379,
                 decode_responses=True,
-                max_connections=4,
+                max_connections=self.max_connections,
             )
 
             self.mongo_client = AsyncIOMotorClient(
                 self.mongo_uri,
-                maxPoolSize=4,
+                maxPoolSize=self.max_connections,
                 minPoolSize=1,
                 serverSelectionTimeoutMS=5000,
             )
