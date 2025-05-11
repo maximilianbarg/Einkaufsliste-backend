@@ -22,7 +22,13 @@ class ScheduledService(BaseService, ABC):
                 next_run = today_run
 
             sleep_seconds = (next_run - now).total_seconds()
-            self.logger.info(f"[{self.service_name}] Next run in {int(sleep_seconds)} seconds.")
+
+            display_seconds = int(sleep_seconds%60)
+            temp = sleep_seconds - display_seconds
+            display_minutes = int((temp/60)%60)
+            temp = (temp/60) - display_minutes
+            display_hours = int((temp)/60)
+            self.logger.info(f"[{self.service_name}] Next run in {display_hours} h {display_minutes} m {display_seconds} s.")
             await asyncio.sleep(sleep_seconds)
 
             try:
