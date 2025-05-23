@@ -14,7 +14,7 @@ from ..collections.helper_methods import delete_collection
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "1234")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 10
 
 
 # OAuth2 Setup
@@ -117,7 +117,7 @@ async def extract_token(token: str) -> UserInDB:
     except JWTError:
         logger.warning(f"Could not validate credentials")
         raise credentials_exception
-    
+
     user = await get_user(username=token_data.username)
     if user is None:
         logger.warning(f"Could not validate credentials")
