@@ -176,7 +176,7 @@ class TestCollectionAPI:
         assert response.json()["source"] != None
         assert response.json()["name"] == "test_collection"
         assert response.json()["data"][0]["event"] == "created"
-        assert response.json()["data"][0]["data"]["name"]  == "test_item"
+        assert response.json()["data"][0]["item"]["name"]  == "test_item"
 
     def test_delete_collection(self):
         # given

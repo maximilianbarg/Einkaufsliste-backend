@@ -61,7 +61,7 @@ async def create_collection(collection_id: str, index: str | None):
     events_collection_id = f"{collection_id}_events"
     await db.create_collection(events_collection_id)
     await db[events_collection_id].create_index([("timestamp", ASCENDING)])
-    
+
 async def delete_collection(collectionId: str):
     db = get_db()
     await db.drop_collection(collectionId)
@@ -89,8 +89,8 @@ async def add_item_event(collection_id: str, event: str, item: Dict):
     # Insert the item into the collection
     await collection_events.insert_one(
         {
-            "event": event, 
-            "data": item, 
+            "event": event,
+            "item": item,
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         }
     )

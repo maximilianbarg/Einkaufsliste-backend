@@ -136,9 +136,9 @@ async def get_changes(
 
     # ObjectId in String umwandeln
     for item in data:
-        item["data"]["id"] = str(item["_id"])
+        item["item"]["id"] = str(item["_id"])
         del item["_id"]
-        del item["data"]["_id"]
+        del item["item"]["_id"]
 
     data_json = {"name": collection_name, "data": data}
 
