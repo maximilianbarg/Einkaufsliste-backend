@@ -1,119 +1,71 @@
-## ids für collections
-- welches Verfahren
-- wie lang?
-- was für Zeichen?
+# Collections
+Collections werden über `user_collections` verwaltet. Dabei wird der `name` der collection zusammen mitden folgenden Attributen gespeichert:
+- `collection_id`: eindeutige Identifikationsnummer
+- `purpose`: Grund oder Kategorie der Liste
+- `owner`: user, dem die collection gehört
+- `users`: alle, die auf die collection zugreifen können
+- `index`: Ein optionaler Index, mit der die Abfrage der items effizienter gemacht werden kann (vgl. MongoDb indexes). Der Index wird immer mit `Ascending` erstellt.
+- `timestamp`: Zeitpunkt der letzten Änderung in utc (zulu) nach `ISO 8601`
 
-## Namensschema
+Der Datentyp wird `collection_info` genannt.
 
-`id` _ `private-oder-shared` _ `Verwendungszweck`
+Jede collection ist eine eigenständige collection in der Datenbank, in der die Daten gespeichert werden. Der Zugriff erfolgt über die `collection_id`, die der name der collection in der Datenbank ist. 
 
-**Bsp.:** 
-- `0123abc456def_private_notes` -> private Notizen von user mit user id 
-- `0123abc456def_private_tasks` -> private tasks von user mit user id 
-- `0223abc456def_shared_tasks` -> geteilte tasks mit der id 
-
->[!important]
->alle privaten Collections beginnen mit der **user id** diese ist eindeutig dem user zugeordnet. Bei den geteilten Collections wird eine neue **id** erstellt und inter der privaten Liste des user gespeichert
-
-## Collections Diagram
-
-```mermaid
-erDiagram
-    USER
-    SHARED_COLLECTIONS {
-        list collection_infos
-    }
-    SHARED_COLLECTION
-    USER_SHARED_COLLECTIONS {
-        list collection_ids
-    }
-
-    USER ||--o{ USER_SHARED_COLLECTIONS : "references id"
-    SHARED_COLLECTIONS ||--|{ SHARED_COLLECTION : "referenced by id of collection"
-    SHARED_COLLECTIONS ||--o{ USER : "references user_id"
-```
-
-## Role
-### Mögliche Rollen:
-#### admin
-##### permissions:
-- verwalten
-- lesen 
-- schreiben
-#### user
-##### permissions:
-- lesen
-- schreiben
-
-```mermaid
-classDiagram
-	direction LR
-
-	class Role {
-        +role : string
-        +admin : bool
-        +read : bool
-        +write : bool
-    }
-```
-
-## User
-```mermaid
-classDiagram
-	direction LR
-    class User {
-        +id : string
-        +name : string
-        +username: string
-        +role : Role
-        +notes : string
-        +tasks : string
-        +shared : list of string
-    }
-    
-	class Role
-    Role *-- User
-```
-
-## Collection Info
-```mermaid
-classDiagram
-	direction LR
-    class User
-    
-    class CollectionInfo {
-        +id : string
-        +Users : List of User
-        +owner : User
-    }
-
-    User *-- Collection
-```
-
-
-## Collection
-Die Collection hat eine **id** als Namen. Die Informationen zu Benutzer und Eigentümer Anzu
-```mermaid
-classDiagram
-	direction LR
-    class User
-    
-    class Collection {
-	    +name : string
-        +data : json
-    }
-
-    User *-- Collection
-```
 
 ## Collection erstellen
+Beim erstellen einer Collection müssen folgende Attribute übergeben werden:
+- `collection_name`: Der Name der der Collection
+- `purpose`: Der Grund oder die Kategorie der Collection (z. B.: Tasks oder Notes)
+- `index`: Ein optionales Feld für das effiziente Abfragen der items
 
+Wenn die Collection erstellt wird, ist diese leer. Gleichzeitig wird in `user_collections` ein Eintrag für die neue Collection mit den Feldern `collection_name`, `owner`, `users`, `purpose` und `last_modified` erzeugt. Für `owner` und `users` wird der `username` des Benutzers eingefügt, der aus dem `JWT` ausgelesen wird. `last_modified` wird auf die aktuelle Zeit gesetzt. Dieses Feld wird bei jeder Änderung an der Collection aktualisiert.
+
+```mermaid
+zenuml
+    title create collection
+    @Actor App
+    @ElasticBeanTalk Backend
+    @Database MongoDB
+
+    App->Backend.post(collection_name, purpose, index) {
+        Backend->MongoDB.get_collection(collection_name) {
+            return collection_or_null
+        }
+
+        if(collection_not_exists) {
+            Backend->MongoDB.create_collection(collection_name, index){
+                return created
+            }
+            Backend->MongoDB.user_collections(collection_name, owner, users, purpose, last_modified){
+                return created
+            }
+
+            // collection created [200]
+            return
+        }
+        else {
+            // collection already exists [403]
+            return 
+        }
+    }
+```
 ## Collection löschen
 
-## Collection entfernen
+## User zu Collection hinzufügen
+
+## User aus Collection entfernen
 
 ## Item zu Collection hinzufügen
 
 ## Item aus Collection aktualisieren
 
 ## Item aus Collection entfernen
+
+
+## Collection aller Änderungen
+Für jede Collection wird eine weitere Collection für die vorgenommenen Änderungen an den items erstellt. Dabei wird bei jeder Änderung (*hinzufügen, ändern oder löschen eines items*) ein Eintrag für die Änderung erzeugt. Das Namenschema ist dabei "`collection_id`_events". Jede Änderung wird mit folgenden Feldern erstellt:
+- `event`: "created", "edited" oder "removed"
+- `item`: das erstellte, geänderte oder gelöschte item
+- `timestamp`: string im utc format (zulu) nach `ISO 8601`
+
+## Collection beobachten (Websockets)
