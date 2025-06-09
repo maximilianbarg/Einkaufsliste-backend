@@ -37,10 +37,6 @@ async def lifespan(app: FastAPI):
     if not master:
         await database_manager.init()
         await connectionManager.init(database_manager)
-    
-    if master:
-        logger.info("Starting background services...")
-        await load_services()
 
     yield
     await database_manager.shutdown()

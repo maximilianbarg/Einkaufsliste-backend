@@ -1,25 +1,11 @@
 from fastapi import HTTPException, Depends, APIRouter, status
+from pymongo import ASCENDING
 from pymongo.collection import Collection
 from typing import Dict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..logger_manager import LoggerManager
-from ..connection_manager import ConnectionManager
-from ..authentication.models import User
-from ..authentication.auth_methods import get_current_active_user
 from ..database_manager import get_db, get_redis
-
-router = APIRouter(
-    prefix="/collections",
-    tags=["collections"],
-    dependencies=[Depends(get_current_active_user)],
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found"}},
-)
-
-cache_time = 300
-
-# Manager-Instanz erstellen
-sockets = ConnectionManager()
 
 # Logging
 logger_instance = LoggerManager()
@@ -63,6 +49,25 @@ async def get_collection_id(collection_name, user_id, should_exist: bool = True)
 
     return collection["id"] if collection else None
 
+async def create_collection(collection_id: str, index: str | None):
+    db = get_db()
+    # Collection erstellen
+    await db.create_collection(collection_id)
+
+    if(index):
+        await db[collection_id].create_index([(index, ASCENDING)])
+
+    # Collection für events erstellen
+    events_collection_id = f"{collection_id}_events"
+    await db.create_collection(events_collection_id)
+    await db[events_collection_id].create_index([("timestamp", ASCENDING)])
+
+async def delete_collection(collectionId: str):
+    db = get_db()
+    await db.drop_collection(collectionId)
+        # delete events list
+    await db.drop_collection(f"{collectionId}_events")
+
 async def update_modified_status_of_collection(collection_id):
     key_pattern = f"collection_cache:{collection_id}*"
     redis = get_redis()
@@ -76,3 +81,17 @@ async def update_modified_status_of_collection(collection_id):
         {"$set": {"last_modified": datetime.now().isoformat()}}
     )
     logger.info(f"Collection info from {collection_id} updated")
+
+
+async def add_item_event(collection_id: str, event: str, item: Dict):
+    # get collection events
+    collection_events: Collection = await get_collection_by_id(f"{collection_id}_events")
+    # Insert the item into the collection
+    await collection_events.insert_one(
+        {
+            "event": event,
+            "item": item,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        }
+    )
+    logger.debug(f"item event added to {collection_id}")

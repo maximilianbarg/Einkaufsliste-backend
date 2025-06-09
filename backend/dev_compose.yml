@@ -64,3 +64,58 @@ services:
     mem_limit: 1g
     networks:
       - app
+
+  # debug only
+  prometheus:
+    image: docker.io/library/prom/prometheus
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  grafana:
+    image: docker.io/library/grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./data/grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana-dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml # dashboard setting
+      - ./grafana-dashboards:/etc/grafana/dashboards # dashboard json files directory
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}
+
+  promtail:
+    image: docker.io/library/grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./promtail.yml:/etc/promtail/docker-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/docker-config.yaml
+    depends_on:
+      - loki
+    networks:
+      - app
+    deploy:
+      replicas: ${DEBUG:-1}

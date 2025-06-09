@@ -160,6 +160,24 @@ class TestCollectionAPI:
         assert response.json()["name"] == "test_collection"
         assert response.json()["data"] != None
 
+    def test_get_collection_changes(self):
+        # given
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
+        item_data = {"name": "test_item", "description": "This is a test item"}
+        collection_id = response.json()["id"]
+        response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
+
+        # when
+        response = requests.get(f"{url}/collections/{collection_id}/changes", headers=headers)
+
+        # then
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["source"] != None
+        assert response.json()["name"] == "test_collection"
+        assert response.json()["data"][0]["event"] == "created"
+        assert response.json()["data"][0]["item"]["name"]  == "test_item"
+
     def test_delete_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
