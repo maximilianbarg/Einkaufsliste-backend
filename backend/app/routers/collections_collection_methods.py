@@ -77,7 +77,7 @@ async def create_table(
 
     # Den Benutzer zur `users_collections`-Tabelle hinzufügen
     await db.users_collections.update_one(
-        {"collection_name": collection_name},
+        {"collection_name": collection_name, "owner": user_id},
         {
             "$set": {
                 "id": collection_id,  # Collection-ID speichern
