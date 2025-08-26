@@ -1,3 +1,5 @@
+from typing import Dict
+
 import requests
 from fastapi import status
 
@@ -61,6 +63,8 @@ class TestCollectionAPI:
         assert response.json()["message"] == "Item created"
         assert response.json()["id"] != None
 
+        self.assert_changes_event(collection_id, "created", 0, headers, item_data)
+
     def test_update_item_in_collection(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
@@ -78,6 +82,8 @@ class TestCollectionAPI:
         # then
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item updated"
+
+        self.assert_changes_event(collection_id, "edited", 1, headers, item_data)
 
     def test_rename_collection(self):
         # given
@@ -142,6 +148,17 @@ class TestCollectionAPI:
         # then
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["message"] == "Item deleted"
+
+        self.assert_changes_event(collection_id, "removed", 1, headers, item_data)
+
+    def assert_changes_event(self, collection_id: str, event: str, event_index: int, headers, item_data: Dict):
+        response = requests.get(f"{url}/collections/{collection_id}/changes", headers=headers)
+        deleted_event = response.json()["data"][event_index]
+        assert response.status_code == status.HTTP_200_OK
+        assert deleted_event["event"] == event
+        deleted_item = deleted_event["item"]
+        assert deleted_item["name"] == item_data["name"]
+        assert deleted_item["description"] == item_data["description"]
 
     def test_get_collection(self):
         # given

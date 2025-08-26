@@ -183,11 +183,13 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     # get collection
     collection = await get_collection_by_id(collection_id)
     # update item
-    updated_item = await collection.find_one_and_update({"_id": ObjectId(item_id)}, {"$set": updates})
+    result = collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
 
-    if updated_item is None:
+    if result is None:
         logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    updated_item = await collection.find_one({"_id": ObjectId(item_id)})
 
     # add item event
     await add_item_event(collection_id, "edited", updated_item)
@@ -213,15 +215,16 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
 async def delete_item(collection_id: str, item_id: str, current_user: User = Depends(get_current_active_user)):
     # get collection
     collection = await get_collection_by_id(collection_id)
-    # delete item
-    result = await collection.delete_one({"_id": ObjectId(item_id)})
 
-    if result.deleted_count == 0:
+    # delete item
+    deleted_item = await collection.find_one_and_delete({"_id": ObjectId(item_id)})
+
+    if deleted_item is None:
         logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
 
     # add item event
-    await add_item_event(collection_id, "removed", {"_id": ObjectId(item_id)})
+    await add_item_event(collection_id, "removed", deleted_item)
 
     # update modified date
     await update_modified_status_of_collection(collection_id)
