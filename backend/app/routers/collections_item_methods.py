@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
+
+from pymongo import ReturnDocument
 from pymongo.collection import Collection, InsertOneResult
 from typing import Dict, Optional
 from redis import Redis
@@ -183,13 +185,11 @@ async def update_item(collection_id: str, item_id: str, updates: Dict, current_u
     # get collection
     collection = await get_collection_by_id(collection_id)
     # update item
-    result = collection.update_one({"_id": ObjectId(item_id)}, {"$set": updates})
+    updated_item = await collection.find_one_and_update({"_id": ObjectId(item_id)}, {"$set": updates}, return_document=ReturnDocument.AFTER)
 
-    if result is None:
+    if updated_item is None:
         logger.warning(f"item {item_id} not in collection {collection_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-
-    updated_item = await collection.find_one({"_id": ObjectId(item_id)})
 
     # add item event
     await add_item_event(collection_id, "edited", updated_item)

@@ -192,8 +192,8 @@ class TestCollectionAPI:
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["source"] != None
         assert response.json()["name"] == "test_collection"
-        assert response.json()["data"][0]["event"] == "created"
-        assert response.json()["data"][0]["item"]["name"]  == "test_item"
+
+        self.assert_changes_event(collection_id, "created", 0, headers, item_data)
 
     def test_delete_collection(self):
         # given
