@@ -4,6 +4,8 @@ import requests
 from fastapi import status
 
 url = "http://localhost:8000"
+item_data = {"name": "test_item", "description": "This is a test item", "label": "red"}
+item_data_2 = {"name": "test_item2", "description": "This is a test item too", "label": "red"}
 
 class TestBase:
 

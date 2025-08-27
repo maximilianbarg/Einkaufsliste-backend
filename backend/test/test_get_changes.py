@@ -3,14 +3,14 @@ from typing import Dict
 import requests
 from fastapi import status
 
-from test.test_base import TestBase, url
+from test.test_base import TestBase, url, item_data
 
 class TestGetChangesAPI(TestBase):
     def test_get_collection_changes(self):
         # given
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.post(f"{url}/collections/create/test_collection/test", headers=headers)
-        item_data = {"name": "test_item", "description": "This is a test item"}
+
         collection_id = response.json()["id"]
         response = requests.post(f"{url}/collections/{collection_id}/item", headers=headers, json=item_data)
 
