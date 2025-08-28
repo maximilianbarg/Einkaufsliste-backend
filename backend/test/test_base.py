@@ -46,8 +46,8 @@ class TestBase:
 
         return response.json().get("access_token")
 
-    def assert_changes_event(self, collection_id: str, event: str, event_index: int, headers, item_data: Dict):
-        response = requests.get(f"{url}/collections/{collection_id}/changes", headers=headers)
+    def assert_changes_event(self, collection_id: str, event: str, event_index: int, headers, item_data: Dict, filter_string: str = ""):
+        response = requests.get(f"{url}/collections/{collection_id}/changes?filter={filter_string}", headers=headers)
 
         change_event = response.json()["data"][event_index]
         assert response.status_code == status.HTTP_200_OK
