@@ -36,10 +36,10 @@ class TestGetItemsAPI(TestBase):
         assert len(json_response["data"]) == expected_size
 
     @pytest.mark.parametrize("items,filter_string,expected_size,expected_items", [
-        (all_items, f"name={test_item_1["name"]}", 1, [test_item_1]),
-        (all_items, f"label={test_item_1["label"]}", 2, red_labeled_items),
-        (all_items, f"label={test_item_3["label"]}", 2, green_labeled_items),
-        (all_items, f"description={test_item_1["description"]}", 4, all_items),
+        (all_items, f"name={test_item_1['name']}", 1, [test_item_1]),
+        (all_items, f"label={test_item_1['label']}", 2, red_labeled_items),
+        (all_items, f"label={test_item_3['label']}", 2, green_labeled_items),
+        (all_items, f"description={test_item_1['description']}", 4, all_items),
     ])
     def test_get_collection_with_filter(self, items, filter_string, expected_size, expected_items):
         # given
