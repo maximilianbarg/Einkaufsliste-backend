@@ -1,7 +1,7 @@
 import requests
 from fastapi import status
 
-url = "http://localhost:8000"
+from .test_base import url
 
 def test_read_main():
     response = requests.get(f"{url}/")

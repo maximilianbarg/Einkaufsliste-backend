@@ -5,8 +5,8 @@ import requests
 import json
 from fastapi import status
 import time
+from .test_base import url
 
-url = "http://localhost:8000"
 uri = "ws://localhost:8000/sockets/connect"
 username2 = "test_websocket_user"
 username1 = "test_websocket_user_2"

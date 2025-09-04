@@ -78,7 +78,7 @@ async def update_modified_status_of_collection(collection_id):
 
     await get_db().users_collections.update_one(
         {"id": collection_id},
-        {"$set": {"last_modified": datetime.now().isoformat()}}
+        {"$set": {"last_modified": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")}}
     )
     logger.info(f"Collection info from {collection_id} updated")
 

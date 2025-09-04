@@ -2,9 +2,13 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, Depends, APIRouter, status, Query
 from bson import ObjectId
 import json
+
+from pymongo import ReturnDocument
 from pymongo.collection import Collection, InsertOneResult
 from typing import Dict, Optional
 from redis import Redis
+from itertools import groupby
+from operator import itemgetter
 
 from ..logger_manager import LoggerManager
 from ..connection_manager import ConnectionManager
@@ -114,6 +118,10 @@ async def get_changes(
         None,
         description="distinct Feld wie 'id' oder 'unique_item_name'"
     ),
+    history: bool = Query(
+        True,
+        description="true oder false für alle Änderungen oder nur die wichtigsten pro item"
+    ),
     current_user: User = Depends(get_current_active_user),
     ):
 
@@ -136,99 +144,62 @@ async def get_changes(
 
     # ObjectId in String umwandeln
     for item in data:
-        item["item"]["id"] = str(item["_id"])
+        item["item"]["id"] = str(item["item"]["_id"])
         del item["_id"]
         del item["item"]["_id"]
+
+    logger.info(f"data={data}")
+
+    if not history:
+        items_events_grouped = group_and_sort_changes(data)
+        data = remove_not_important_changes(items_events_grouped)
+        logger.info(f"filtered={data}")
+
 
     data_json = {"name": collection_name, "data": data}
 
     logger.info(f"collection {collection_id} changes retreaved")
     return {"source": "db"} | data_json
 
-# MongoDB: Einzelnes Item erstellen
-@router.post("/{collection_id}/item")
-async def create_item(collection_id: str, item: Dict, current_user: User = Depends(get_current_active_user)):
-    # get collection
-    collection: Collection = await get_collection_by_id(collection_id)
-    # Insert the item into the collection
-    result: InsertOneResult = await collection.insert_one(item)
 
-    # add item event
-    await add_item_event(collection_id, "created", item)
+def remove_not_important_changes(items_events_grouped) -> list[Dict]:
+    data = []
+    for collection_id, item_events in items_events_grouped.items():
+        created = None
+        edited = None
+        removed = None
 
-    # update modified date
-    await update_modified_status_of_collection(collection_id)
+        for item_event in item_events:
+            match item_event["event"]:
+                case "created":
+                    created = item_event
+                case "edited":
+                    edited = item_event
+                case "removed":
+                    removed = item_event
+                case _:  # default case
+                    raise ValueError(f"unknown event: {item_event['event']}")
 
-    item_id = str(result.inserted_id)
+        if created is not None and edited is not None and removed is None:
+            data.append(created)
+            data.append(edited)
 
-    # Das aktualisierte Item abrufen
-    created_item = await collection.find_one({"_id": ObjectId(item_id)})
+        elif created is not None and edited is None and removed is None:
+            data.append(created)
 
-    # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
-    if created_item:
-        created_item["id"] = str(created_item["_id"])  # ObjectId in String umwandeln
-        del created_item["_id"]
+        elif created is None and edited is not None and removed is None:
+            data.append(edited)
 
-    logger.info(f"item in collection {collection_id} created")
+        elif created is None and removed is not None:
+            data.append(removed)
 
-    # Publish a WebSocket notification
-    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "created", "item": created_item}))
-
-    # Return the inserted item's ID
-    return {"message": "Item created", "id": item_id}
-
-# MongoDB: Einzelnes Item bearbeiten
-@router.put("/{collection_id}/item/{item_id}")
-async def update_item(collection_id: str, item_id: str, updates: Dict, current_user: User = Depends(get_current_active_user)):
-    # get collection
-    collection = await get_collection_by_id(collection_id)
-    # update item
-    updated_item = await collection.find_one_and_update({"_id": ObjectId(item_id)}, {"$set": updates})
-
-    if updated_item is None:
-        logger.warning(f"item {item_id} not in collection {collection_id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-
-    # add item event
-    await add_item_event(collection_id, "edited", updated_item)
-
-    # update modified date
-    await update_modified_status_of_collection(collection_id)
-
-    # Sicherstellen, dass das Item JSON-serialisierbar ist (z. B. ObjectId in String umwandeln)
-    if updated_item:
-        updated_item["id"] = str(updated_item["_id"])  # ObjectId in String umwandeln
-        del updated_item["_id"]
-
-    logger.info(f"item in collection {collection_id} updated")
-
-    # Publish a WebSocket notification
-    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "edited", "item": updates}))
-
-    return {"message": "Item updated", "id": item_id}
+    return data
 
 
-# MongoDB: Einzelnes Item löschen
-@router.delete("/{collection_id}/item/{item_id}")
-async def delete_item(collection_id: str, item_id: str, current_user: User = Depends(get_current_active_user)):
-    # get collection
-    collection = await get_collection_by_id(collection_id)
-    # delete item
-    result = await collection.delete_one({"_id": ObjectId(item_id)})
+def group_and_sort_changes(items: list[Dict]) -> Dict:
+    items_sorted = sorted(items, key=lambda x: (x["item"]["id"], x["timestamp"]))
 
-    if result.deleted_count == 0:
-        logger.warning(f"item {item_id} not in collection {collection_id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
-
-    # add item event
-    await add_item_event(collection_id, "removed", {"_id": ObjectId(item_id)})
-
-    # update modified date
-    await update_modified_status_of_collection(collection_id)
-
-    logger.info(f"item in collection {collection_id} deleted")
-
-    # Publish a WebSocket notification
-    await sockets.send_to_channel(f"{current_user.username}", f"{collection_id}", json.dumps({"event": "removed", "id": f"{item_id}"}))
-
-    return {"message": "Item deleted", "id": item_id}
+    return {
+        _id: list(group)
+        for _id, group in groupby(items_sorted, key=lambda x: (x["item"]["id"]))
+    }
