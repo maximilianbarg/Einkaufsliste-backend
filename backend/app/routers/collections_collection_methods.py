@@ -179,7 +179,7 @@ async def unshare_collection(
 
     # add user to list
     result = await db.users_collections.update_one(
-        {"id": collection_id, "owner": current_user.username},
+        {"id": collection_id, "users": current_user.username},
         {"$pull": {"users": user_id}}
     )
 
