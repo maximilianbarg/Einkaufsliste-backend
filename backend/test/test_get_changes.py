@@ -5,7 +5,7 @@ import pytest
 import requests
 from fastapi import status
 
-from test.test_base import TestBase, url, test_item_1, all_items, red_labeled_items, green_labeled_items
+from .test_base import TestBase, url, test_item_1, all_items, red_labeled_items
 
 
 class TestGetChangesAPI(TestBase):

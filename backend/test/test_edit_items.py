@@ -3,7 +3,7 @@ from typing import Dict
 import requests
 from fastapi import status
 
-from test.test_base import TestBase, url, test_item_1
+from .test_base import TestBase, url, test_item_1
 
 class TestEditItemsAPI(TestBase):
     def test_add_item_to_collection(self):

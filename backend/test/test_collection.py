@@ -3,7 +3,7 @@ from typing import Dict
 import requests
 from fastapi import status
 
-from test.test_base import TestBase, url
+from .test_base import TestBase, url
 
 class TestCollectionAPI(TestBase):
 

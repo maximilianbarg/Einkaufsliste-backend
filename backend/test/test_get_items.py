@@ -4,7 +4,7 @@ import pytest
 import requests
 from fastapi import status
 
-from test.test_base import TestBase, url, test_item_1, test_item_2, red_labeled_items, all_items, green_labeled_items, \
+from .test_base import TestBase, url, test_item_1, test_item_2, red_labeled_items, all_items, green_labeled_items, \
     test_item_3, test_item_4
 
 
