@@ -7,4 +7,4 @@ class TestService(BaseService):
     async def run(self):
         while True:
             self.logger.info(f"[{self.service_name}] Doing some background work...")
-            await asyncio.sleep(60)
+            await asyncio.sleep(1)
